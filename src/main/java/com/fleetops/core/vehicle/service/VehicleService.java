@@ -1,0 +1,49 @@
+package com.fleetops.core.vehicle.service;
+
+import com.fleetops.core.exception.ConflictException;
+import com.fleetops.core.exception.ResourceNotFoundException;
+import com.fleetops.core.vehicle.dto.VehicleRequest;
+import com.fleetops.core.vehicle.dto.VehicleResponse;
+import com.fleetops.core.vehicle.entity.Vehicle;
+import com.fleetops.core.vehicle.enums.VehicleStatus;
+import com.fleetops.core.vehicle.repository.VehicleRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class VehicleService {
+
+    private final VehicleRepository vehicleRepository;
+
+    public VehicleResponse registerVehicle(VehicleRequest request) {
+        if (vehicleRepository.existsByPlateNumber(request.getPlateNumber())) {
+            throw new ConflictException("Plate number already registered: " + request.getPlateNumber());
+        }
+        Vehicle vehicle = Vehicle.builder()
+                .make(request.getMake())
+                .model(request.getModel())
+                .plateNumber(request.getPlateNumber())
+                .milestoneInterval(request.getMilestoneInterval() != null
+                        ? request.getMilestoneInterval() : 5000.0)
+                .build();
+        return VehicleResponse.from(vehicleRepository.save(vehicle));
+    }
+
+    public List<VehicleResponse> getAllVehicles() {
+        return vehicleRepository.findAll().stream().map(VehicleResponse::from).toList();
+    }
+
+    public List<VehicleResponse> getAvailableVehicles() {
+        return vehicleRepository.findByStatus(VehicleStatus.AVAILABLE)
+                .stream().map(VehicleResponse::from).toList();
+    }
+
+    public VehicleResponse getVehicleById(Long id) {
+        return vehicleRepository.findById(id)
+                .map(VehicleResponse::from)
+                .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + id));
+    }
+}
