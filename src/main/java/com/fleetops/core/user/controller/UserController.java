@@ -1,6 +1,7 @@
 package com.fleetops.core.user.controller;
 
 import com.fleetops.core.user.dto.CreateUserRequest;
+import com.fleetops.core.user.dto.ResetPasswordRequest;
 import com.fleetops.core.user.dto.UserResponse;
 import com.fleetops.core.user.service.UserService;
 import jakarta.validation.Valid;
@@ -35,5 +36,14 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UserResponse> getUserById(@PathVariable Long id) {
         return ResponseEntity.ok(userService.getUserById(id));
+    }
+
+    @PatchMapping("/{id}/reset-password")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> resetPassword(
+            @PathVariable Long id,
+            @Valid @RequestBody ResetPasswordRequest request) {
+        userService.resetPassword(id, request);
+        return ResponseEntity.noContent().build();
     }
 }

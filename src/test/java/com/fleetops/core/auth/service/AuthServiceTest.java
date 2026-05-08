@@ -1,20 +1,28 @@
 package com.fleetops.core.auth.service;
 
 import com.fleetops.core.auth.dto.AuthResponse;
+import com.fleetops.core.auth.dto.ChangePasswordRequest;
 import com.fleetops.core.auth.dto.LoginRequest;
 import com.fleetops.core.auth.util.JwtUtil;
+import com.fleetops.core.exception.ResourceNotFoundException;
 import com.fleetops.core.user.entity.User;
 import com.fleetops.core.user.enums.UserRole;
 import com.fleetops.core.user.repository.UserRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
 
@@ -29,8 +37,14 @@ class AuthServiceTest {
     @Mock private AuthenticationManager authenticationManager;
     @Mock private UserRepository userRepository;
     @Mock private JwtUtil jwtUtil;
+    @Mock private PasswordEncoder passwordEncoder;
 
     @InjectMocks private AuthService authService;
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
 
     // ── login ────────────────────────────────────────────────────────────────
 
@@ -100,5 +114,75 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.login(request))
                 .isInstanceOf(UsernameNotFoundException.class);
+    }
+
+    // ── changePassword ───────────────────────────────────────────────────────
+
+    @Test
+    void changePassword_success_encodesAndSavesNewPassword() {
+        mockSecurityContext("staff@fleetops.com");
+        User user = user(1L, "staff@fleetops.com", "hashed_old");
+
+        when(userRepository.findByEmail("staff@fleetops.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("OldPass@1", "hashed_old")).thenReturn(true);
+        when(passwordEncoder.encode("NewPass@2")).thenReturn("hashed_new");
+        when(userRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        ChangePasswordRequest req = new ChangePasswordRequest();
+        req.setCurrentPassword("OldPass@1");
+        req.setNewPassword("NewPass@2");
+
+        authService.changePassword(req);
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(captor.capture());
+        assertThat(captor.getValue().getPassword()).isEqualTo("hashed_new");
+    }
+
+    @Test
+    void changePassword_wrongCurrentPassword_throwsBadCredentials() {
+        mockSecurityContext("staff@fleetops.com");
+        User user = user(1L, "staff@fleetops.com", "hashed_old");
+
+        when(userRepository.findByEmail("staff@fleetops.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("WrongPass", "hashed_old")).thenReturn(false);
+
+        ChangePasswordRequest req = new ChangePasswordRequest();
+        req.setCurrentPassword("WrongPass");
+        req.setNewPassword("NewPass@2");
+
+        assertThatThrownBy(() -> authService.changePassword(req))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessageContaining("incorrect");
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void changePassword_userNotFound_throwsResourceNotFound() {
+        mockSecurityContext("ghost@fleetops.com");
+        when(userRepository.findByEmail("ghost@fleetops.com")).thenReturn(Optional.empty());
+
+        ChangePasswordRequest req = new ChangePasswordRequest();
+        req.setCurrentPassword("anything");
+        req.setNewPassword("NewPass@2");
+
+        assertThatThrownBy(() -> authService.changePassword(req))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(userRepository, never()).save(any());
+    }
+
+    // ── helpers ─────────────────────────────────────────────────────────────
+
+    private void mockSecurityContext(String email) {
+        Authentication auth = mock(Authentication.class);
+        SecurityContext ctx = mock(SecurityContext.class);
+        when(auth.getName()).thenReturn(email);
+        when(ctx.getAuthentication()).thenReturn(auth);
+        SecurityContextHolder.setContext(ctx);
+    }
+
+    private User user(Long id, String email, String hashedPassword) {
+        return User.builder().id(id).name("Test User").email(email)
+                .password(hashedPassword).role(UserRole.FIELD_STAFF).build();
     }
 }

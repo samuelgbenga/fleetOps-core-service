@@ -1,7 +1,6 @@
 package com.fleetops.core.vehicle.controller;
 
 import com.fleetops.core.vehicle.dto.MilestoneIntervalRequest;
-import com.fleetops.core.vehicle.dto.ServiceHistoryRequest;
 import com.fleetops.core.vehicle.dto.VehicleRequest;
 import com.fleetops.core.vehicle.dto.VehicleResponse;
 import com.fleetops.core.vehicle.service.VehicleService;
@@ -45,16 +44,8 @@ public class VehicleController {
         return ResponseEntity.ok(vehicleService.getVehicleById(id));
     }
 
-    @PatchMapping("/{id}/service-history")
-    @PreAuthorize("hasRole('FLEET_MANAGER', 'ADMIN')")
-    public ResponseEntity<VehicleResponse> updateServiceHistory(
-            @PathVariable Long id,
-            @Valid @RequestBody ServiceHistoryRequest request) {
-        return ResponseEntity.ok(vehicleService.updateServiceHistory(id, request));
-    }
-
     @PatchMapping("/{id}/milestone-interval")
-    @PreAuthorize("hasRole('FLEET_MANAGER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('FLEET_MANAGER', 'ADMIN')")
     public ResponseEntity<VehicleResponse> updateMilestoneInterval(
             @PathVariable Long id,
             @Valid @RequestBody MilestoneIntervalRequest request) {

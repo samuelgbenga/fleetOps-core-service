@@ -10,7 +10,7 @@ public class MileageLogRequest {
     @NotNull(message = "Vehicle ID is required")
     private Long vehicleId;
 
-    @NotNull(message = "Mileage added is required")
-    @Positive(message = "Mileage added must be greater than 0")
-    private Double mileageAdded;
+    @NotNull(message = "Reported mileage is required")
+    @Positive(message = "Reported mileage must be greater than 0")
+    private Double reportedMileage;
 }

@@ -4,5 +4,6 @@ public enum FlagStatus {
     OPEN,
     ASSIGNED,
     IN_PROGRESS,
+    PENDING_APPROVAL,
     RESOLVED
 }

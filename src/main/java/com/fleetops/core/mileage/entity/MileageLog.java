@@ -28,11 +28,9 @@ public class MileageLog {
     @JoinColumn(name = "submitted_by", nullable = false)
     private User submittedBy;
 
-    @Column(name = "mileage_added", nullable = false)
-    private Double mileageAdded;
-
-    @Column(name = "mileage_after", nullable = false)
-    private Double mileageAfter;
+    // Odometer reading submitted by field staff — not a per-trip delta
+    @Column(name = "reported_mileage", nullable = false)
+    private Double reportedMileage;
 
     @Column(name = "logged_at", nullable = false, updatable = false)
     private LocalDateTime loggedAt;

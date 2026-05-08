@@ -1,5 +1,6 @@
 package com.fleetops.core.mileage.service;
 
+import com.fleetops.core.exception.ConflictException;
 import com.fleetops.core.exception.ResourceNotFoundException;
 import com.fleetops.core.kafka.event.MaintenanceFlagCreatedEvent;
 import com.fleetops.core.kafka.producer.MaintenanceEventProducer;
@@ -40,23 +41,30 @@ public class MileageLogService {
         Vehicle vehicle = vehicleRepository.findById(request.getVehicleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + request.getVehicleId()));
 
-        Double oldMileage = vehicle.getCurrentMileage();
-        Double newMileage = oldMileage + request.getMileageAdded();
+        Double reportedMileage = request.getReportedMileage();
+        Double previousMileage = vehicle.getCurrentMileage();
 
-        vehicle.setCurrentMileage(newMileage);
+        if (reportedMileage < previousMileage) {
+            throw new ConflictException(
+                    "Reported mileage (" + reportedMileage + " km) cannot be less than the vehicle's " +
+                    "current recorded mileage (" + previousMileage + " km)"
+            );
+        }
+
+        // Set odometer reading directly — this is not a per-trip delta
+        vehicle.setCurrentMileage(reportedMileage);
         vehicleRepository.save(vehicle);
 
         MileageLog mileageLog = MileageLog.builder()
                 .vehicle(vehicle)
                 .submittedBy(submittedBy)
-                .mileageAdded(request.getMileageAdded())
-                .mileageAfter(newMileage)
+                .reportedMileage(reportedMileage)
                 .build();
         mileageLogRepository.save(mileageLog);
 
-        if (vehicle.isMilestoneReached(oldMileage)) {
-            log.info("Milestone reached for vehicle {}. Publishing event.", vehicle.getPlateNumber());
-            publishMaintenanceEvent(vehicle, newMileage);
+        if (vehicle.isMilestoneReached(previousMileage)) {
+            log.info("Milestone reached for vehicle {}. Publishing maintenance event.", vehicle.getPlateNumber());
+            publishMaintenanceEvent(vehicle, reportedMileage);
         }
 
         return MileageLogResponse.from(mileageLog);

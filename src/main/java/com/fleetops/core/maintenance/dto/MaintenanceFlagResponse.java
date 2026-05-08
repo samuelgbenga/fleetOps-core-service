@@ -22,6 +22,7 @@ public class MaintenanceFlagResponse {
     private String progressNotes;
     private LocalDateTime triggeredAt;
     private LocalDateTime assignedAt;
+    private LocalDateTime pendingApprovalAt;
     private LocalDateTime resolvedAt;
 
     public static MaintenanceFlagResponse from(MaintenanceFlag f) {
@@ -38,6 +39,7 @@ public class MaintenanceFlagResponse {
                 .progressNotes(f.getProgressNotes())
                 .triggeredAt(f.getTriggeredAt())
                 .assignedAt(f.getAssignedAt())
+                .pendingApprovalAt(f.getPendingApprovalAt())
                 .resolvedAt(f.getResolvedAt())
                 .build();
     }

@@ -1,5 +1,6 @@
 package com.fleetops.core.maintenance.controller;
 
+import com.fleetops.core.maintenance.dto.ApproveFlagRequest;
 import com.fleetops.core.maintenance.dto.AssignFlagRequest;
 import com.fleetops.core.maintenance.dto.MaintenanceFlagResponse;
 import com.fleetops.core.maintenance.dto.ProgressUpdateRequest;
@@ -31,14 +32,16 @@ public class MaintenanceFlagController {
         return ResponseEntity.ok(maintenanceFlagService.getMyAssignedFlags());
     }
 
+    /** Fleet manager assigns an OPEN flag to a maintenance team member */
     @PatchMapping("/{id}/assign")
-    @PreAuthorize("hasRole('FLEET_MANAGER')")
+    @PreAuthorize("hasAnyRole('FLEET_MANAGER', 'ADMIN')")
     public ResponseEntity<MaintenanceFlagResponse> assign(
             @PathVariable Long id,
             @Valid @RequestBody AssignFlagRequest request) {
         return ResponseEntity.ok(maintenanceFlagService.assignFlag(id, request));
     }
 
+    /** Maintenance team updates progress notes — moves flag to IN_PROGRESS */
     @PatchMapping("/{id}/progress")
     @PreAuthorize("hasRole('MAINTENANCE_TEAM')")
     public ResponseEntity<MaintenanceFlagResponse> progress(
@@ -47,9 +50,19 @@ public class MaintenanceFlagController {
         return ResponseEntity.ok(maintenanceFlagService.updateProgress(id, request));
     }
 
-    @PatchMapping("/{id}/resolve")
+    /** Maintenance team signals work is done — moves flag to PENDING_APPROVAL and notifies fleet manager */
+    @PatchMapping("/{id}/done")
     @PreAuthorize("hasRole('MAINTENANCE_TEAM')")
-    public ResponseEntity<MaintenanceFlagResponse> resolve(@PathVariable Long id) {
-        return ResponseEntity.ok(maintenanceFlagService.resolveFlag(id));
+    public ResponseEntity<MaintenanceFlagResponse> markDone(@PathVariable Long id) {
+        return ResponseEntity.ok(maintenanceFlagService.markWorkDone(id));
+    }
+
+    /** Fleet manager approves maintenance — requires new milestone interval + service notes */
+    @PatchMapping("/{id}/approve")
+    @PreAuthorize("hasAnyRole('FLEET_MANAGER', 'ADMIN')")
+    public ResponseEntity<MaintenanceFlagResponse> approve(
+            @PathVariable Long id,
+            @Valid @RequestBody ApproveFlagRequest request) {
+        return ResponseEntity.ok(maintenanceFlagService.approveMaintenance(id, request));
     }
 }

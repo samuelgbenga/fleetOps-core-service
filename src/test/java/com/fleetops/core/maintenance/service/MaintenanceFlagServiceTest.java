@@ -4,6 +4,7 @@ import com.fleetops.core.exception.ConflictException;
 import com.fleetops.core.exception.ResourceNotFoundException;
 import com.fleetops.core.kafka.event.NotificationRequestEvent;
 import com.fleetops.core.kafka.producer.NotificationEventProducer;
+import com.fleetops.core.maintenance.dto.ApproveFlagRequest;
 import com.fleetops.core.maintenance.dto.AssignFlagRequest;
 import com.fleetops.core.maintenance.dto.MaintenanceFlagResponse;
 import com.fleetops.core.maintenance.dto.ProgressUpdateRequest;
@@ -15,6 +16,7 @@ import com.fleetops.core.user.enums.UserRole;
 import com.fleetops.core.user.repository.UserRepository;
 import com.fleetops.core.vehicle.entity.Vehicle;
 import com.fleetops.core.vehicle.enums.VehicleStatus;
+import com.fleetops.core.vehicle.repository.ServiceHistoryRepository;
 import com.fleetops.core.vehicle.repository.VehicleRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -41,6 +43,7 @@ class MaintenanceFlagServiceTest {
     @Mock private MaintenanceFlagRepository maintenanceFlagRepository;
     @Mock private UserRepository userRepository;
     @Mock private VehicleRepository vehicleRepository;
+    @Mock private ServiceHistoryRepository serviceHistoryRepository;
     @Mock private NotificationEventProducer notificationEventProducer;
 
     @InjectMocks private MaintenanceFlagService maintenanceFlagService;
@@ -54,7 +57,7 @@ class MaintenanceFlagServiceTest {
 
     @Test
     void getAllFlags_returnsAllFlags() {
-        Vehicle vehicle = vehicle(10L);
+        Vehicle vehicle = vehicle(10L, 10000.0, 5000.0);
         when(maintenanceFlagRepository.findAll()).thenReturn(List.of(
                 openFlag(1L, vehicle),
                 flagWithStatus(2L, vehicle, FlagStatus.RESOLVED)
@@ -79,7 +82,7 @@ class MaintenanceFlagServiceTest {
     void getMyAssignedFlags_success_returnsAssignedToCurrentUser() {
         mockSecurityContext("tech@fleetops.com");
         User tech = maintenanceUser(5L, "tech@fleetops.com");
-        Vehicle vehicle = vehicle(10L);
+        Vehicle vehicle = vehicle(10L, 10000.0, 5000.0);
         MaintenanceFlag flag = openFlag(1L, vehicle);
         flag.setAssignedTo(tech);
         flag.setStatus(FlagStatus.ASSIGNED);
@@ -107,7 +110,7 @@ class MaintenanceFlagServiceTest {
     @Test
     void assignFlag_success_setsAssignedStatusAndNotifiesTech() {
         mockSecurityContext("manager@fleetops.com");
-        Vehicle vehicle = vehicle(10L);
+        Vehicle vehicle = vehicle(10L, 10000.0, 5000.0);
         MaintenanceFlag flag = openFlag(1L, vehicle);
         User tech = maintenanceUser(5L, "tech@fleetops.com");
         User manager = manager(2L, "manager@fleetops.com");
@@ -132,7 +135,7 @@ class MaintenanceFlagServiceTest {
 
     @Test
     void assignFlag_flagNotOpen_throwsConflict() {
-        Vehicle vehicle = vehicle(10L);
+        Vehicle vehicle = vehicle(10L, 10000.0, 5000.0);
         MaintenanceFlag flag = flagWithStatus(1L, vehicle, FlagStatus.ASSIGNED);
         when(maintenanceFlagRepository.findById(1L)).thenReturn(Optional.of(flag));
 
@@ -146,7 +149,7 @@ class MaintenanceFlagServiceTest {
 
     @Test
     void assignFlag_maintenanceUserNotFound_throwsResourceNotFound() {
-        Vehicle vehicle = vehicle(10L);
+        Vehicle vehicle = vehicle(10L, 10000.0, 5000.0);
         MaintenanceFlag flag = openFlag(1L, vehicle);
 
         when(maintenanceFlagRepository.findById(1L)).thenReturn(Optional.of(flag));
@@ -175,7 +178,7 @@ class MaintenanceFlagServiceTest {
 
     @Test
     void updateProgress_fromAssigned_setsInProgressAndNotifiesManager() {
-        Vehicle vehicle = vehicle(10L);
+        Vehicle vehicle = vehicle(10L, 10000.0, 5000.0);
         User manager = manager(2L, "manager@fleetops.com");
         MaintenanceFlag flag = flagWithStatus(1L, vehicle, FlagStatus.ASSIGNED);
         flag.setAssignedBy(manager);
@@ -199,7 +202,7 @@ class MaintenanceFlagServiceTest {
 
     @Test
     void updateProgress_fromInProgress_updatesNotes() {
-        Vehicle vehicle = vehicle(10L);
+        Vehicle vehicle = vehicle(10L, 10000.0, 5000.0);
         MaintenanceFlag flag = flagWithStatus(1L, vehicle, FlagStatus.IN_PROGRESS);
         flag.setAssignedBy(null);
 
@@ -217,7 +220,7 @@ class MaintenanceFlagServiceTest {
 
     @Test
     void updateProgress_flagIsOpen_throwsConflict() {
-        Vehicle vehicle = vehicle(10L);
+        Vehicle vehicle = vehicle(10L, 10000.0, 5000.0);
         MaintenanceFlag flag = openFlag(1L, vehicle);
         when(maintenanceFlagRepository.findById(1L)).thenReturn(Optional.of(flag));
 
@@ -231,7 +234,7 @@ class MaintenanceFlagServiceTest {
 
     @Test
     void updateProgress_flagIsResolved_throwsConflict() {
-        Vehicle vehicle = vehicle(10L);
+        Vehicle vehicle = vehicle(10L, 10000.0, 5000.0);
         MaintenanceFlag flag = flagWithStatus(1L, vehicle, FlagStatus.RESOLVED);
         when(maintenanceFlagRepository.findById(1L)).thenReturn(Optional.of(flag));
 
@@ -242,65 +245,171 @@ class MaintenanceFlagServiceTest {
                 .isInstanceOf(ConflictException.class);
     }
 
-    // ── resolveFlag ───────────────────────────────────────────────────────────
+    // ── markWorkDone ─────────────────────────────────────────────────────────
 
     @Test
-    void resolveFlag_success_setsResolvedAndVehicleAvailable() {
-        Vehicle vehicle = vehicle(10L);
-        vehicle.setStatus(VehicleStatus.MAINTENANCE);
+    void markWorkDone_fromInProgress_setsPendingApprovalAndNotifiesManager() {
+        Vehicle vehicle = vehicle(10L, 10000.0, 5000.0);
         User manager = manager(2L, "manager@fleetops.com");
+        User tech = maintenanceUser(5L, "tech@fleetops.com");
         MaintenanceFlag flag = flagWithStatus(1L, vehicle, FlagStatus.IN_PROGRESS);
+        flag.setAssignedBy(manager);
+        flag.setAssignedTo(tech);
+
+        when(maintenanceFlagRepository.findById(1L)).thenReturn(Optional.of(flag));
+        when(maintenanceFlagRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        MaintenanceFlagResponse response = maintenanceFlagService.markWorkDone(1L);
+
+        assertThat(response.getStatus()).isEqualTo(FlagStatus.PENDING_APPROVAL);
+
+        ArgumentCaptor<NotificationRequestEvent> captor = ArgumentCaptor.forClass(NotificationRequestEvent.class);
+        verify(notificationEventProducer).publish(captor.capture());
+        NotificationRequestEvent notification = captor.getValue();
+        assertThat(notification.getType()).isEqualTo("FLAG_PENDING_APPROVAL");
+        assertThat(notification.getRecipientEmail()).isEqualTo("manager@fleetops.com");
+    }
+
+    @Test
+    void markWorkDone_fromAssigned_setsPendingApproval() {
+        Vehicle vehicle = vehicle(10L, 10000.0, 5000.0);
+        User manager = manager(2L, "manager@fleetops.com");
+        MaintenanceFlag flag = flagWithStatus(1L, vehicle, FlagStatus.ASSIGNED);
         flag.setAssignedBy(manager);
 
         when(maintenanceFlagRepository.findById(1L)).thenReturn(Optional.of(flag));
         when(maintenanceFlagRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(vehicleRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-        MaintenanceFlagResponse response = maintenanceFlagService.resolveFlag(1L);
+        MaintenanceFlagResponse response = maintenanceFlagService.markWorkDone(1L);
+
+        assertThat(response.getStatus()).isEqualTo(FlagStatus.PENDING_APPROVAL);
+    }
+
+    @Test
+    void markWorkDone_flagIsOpen_throwsConflict() {
+        Vehicle vehicle = vehicle(10L, 10000.0, 5000.0);
+        MaintenanceFlag flag = openFlag(1L, vehicle);
+        when(maintenanceFlagRepository.findById(1L)).thenReturn(Optional.of(flag));
+
+        assertThatThrownBy(() -> maintenanceFlagService.markWorkDone(1L))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("ASSIGNED or IN_PROGRESS");
+    }
+
+    @Test
+    void markWorkDone_flagAlreadyPendingApproval_throwsConflict() {
+        Vehicle vehicle = vehicle(10L, 10000.0, 5000.0);
+        MaintenanceFlag flag = flagWithStatus(1L, vehicle, FlagStatus.PENDING_APPROVAL);
+        when(maintenanceFlagRepository.findById(1L)).thenReturn(Optional.of(flag));
+
+        assertThatThrownBy(() -> maintenanceFlagService.markWorkDone(1L))
+                .isInstanceOf(ConflictException.class);
+    }
+
+    @Test
+    void markWorkDone_flagNotFound_throwsResourceNotFound() {
+        when(maintenanceFlagRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> maintenanceFlagService.markWorkDone(999L))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    // ── approveMaintenance ───────────────────────────────────────────────────
+
+    @Test
+    void approveMaintenance_success_createsServiceHistoryAndReleasesVehicle() {
+        mockSecurityContext("manager@fleetops.com");
+        // Vehicle at 10,000 km, previous interval 5,000 — new interval must be > both
+        Vehicle vehicle = vehicle(10L, 10000.0, 5000.0);
+        vehicle.setStatus(VehicleStatus.MAINTENANCE);
+        User manager = manager(2L, "manager@fleetops.com");
+        User tech = maintenanceUser(5L, "tech@fleetops.com");
+        MaintenanceFlag flag = flagWithStatus(1L, vehicle, FlagStatus.PENDING_APPROVAL);
+        flag.setAssignedBy(manager);
+        flag.setAssignedTo(tech);
+
+        when(maintenanceFlagRepository.findById(1L)).thenReturn(Optional.of(flag));
+        when(userRepository.findByEmail("manager@fleetops.com")).thenReturn(Optional.of(manager));
+        when(serviceHistoryRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(vehicleRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(maintenanceFlagRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        ApproveFlagRequest req = new ApproveFlagRequest();
+        req.setNewMilestoneInterval(15000.0);
+        req.setServiceNotes("Engine overhaul. All fluids replaced.");
+
+        MaintenanceFlagResponse response = maintenanceFlagService.approveMaintenance(1L, req);
 
         assertThat(response.getStatus()).isEqualTo(FlagStatus.RESOLVED);
         assertThat(vehicle.getStatus()).isEqualTo(VehicleStatus.AVAILABLE);
+        assertThat(vehicle.getMilestoneInterval()).isEqualTo(15000.0);
+        verify(serviceHistoryRepository).save(any());
         verify(vehicleRepository).save(vehicle);
 
         ArgumentCaptor<NotificationRequestEvent> captor = ArgumentCaptor.forClass(NotificationRequestEvent.class);
         verify(notificationEventProducer).publish(captor.capture());
         assertThat(captor.getValue().getType()).isEqualTo("FLAG_RESOLVED");
-        assertThat(captor.getValue().getRecipientEmail()).isEqualTo("manager@fleetops.com");
+        assertThat(captor.getValue().getRecipientEmail()).isEqualTo("tech@fleetops.com");
     }
 
     @Test
-    void resolveFlag_noAssignedBy_vehicleStillBecomesAvailable_noNotification() {
-        Vehicle vehicle = vehicle(10L);
-        vehicle.setStatus(VehicleStatus.MAINTENANCE);
-        MaintenanceFlag flag = flagWithStatus(1L, vehicle, FlagStatus.ASSIGNED);
-        flag.setAssignedBy(null);
-
-        when(maintenanceFlagRepository.findById(1L)).thenReturn(Optional.of(flag));
-        when(maintenanceFlagRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(vehicleRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-
-        maintenanceFlagService.resolveFlag(1L);
-
-        assertThat(vehicle.getStatus()).isEqualTo(VehicleStatus.AVAILABLE);
-        verify(notificationEventProducer, never()).publish(any());
-    }
-
-    @Test
-    void resolveFlag_alreadyResolved_throwsConflict() {
-        Vehicle vehicle = vehicle(10L);
-        MaintenanceFlag flag = flagWithStatus(1L, vehicle, FlagStatus.RESOLVED);
+    void approveMaintenance_flagNotPendingApproval_throwsConflict() {
+        Vehicle vehicle = vehicle(10L, 10000.0, 5000.0);
+        MaintenanceFlag flag = flagWithStatus(1L, vehicle, FlagStatus.IN_PROGRESS);
         when(maintenanceFlagRepository.findById(1L)).thenReturn(Optional.of(flag));
 
-        assertThatThrownBy(() -> maintenanceFlagService.resolveFlag(1L))
+        ApproveFlagRequest req = new ApproveFlagRequest();
+        req.setNewMilestoneInterval(15000.0);
+        req.setServiceNotes("notes");
+
+        assertThatThrownBy(() -> maintenanceFlagService.approveMaintenance(1L, req))
                 .isInstanceOf(ConflictException.class)
-                .hasMessageContaining("already resolved");
+                .hasMessageContaining("PENDING_APPROVAL");
     }
 
     @Test
-    void resolveFlag_notFound_throwsResourceNotFound() {
+    void approveMaintenance_newIntervalNotGreaterThanPreviousInterval_throwsConflict() {
+        // No security context needed — service throws before reaching the authenticated-user lookup
+        // Previous interval is 5,000 — submitting same value should fail
+        Vehicle vehicle = vehicle(10L, 4500.0, 5000.0);
+        MaintenanceFlag flag = flagWithStatus(1L, vehicle, FlagStatus.PENDING_APPROVAL);
+        when(maintenanceFlagRepository.findById(1L)).thenReturn(Optional.of(flag));
+
+        ApproveFlagRequest req = new ApproveFlagRequest();
+        req.setNewMilestoneInterval(5000.0);
+        req.setServiceNotes("notes");
+
+        assertThatThrownBy(() -> maintenanceFlagService.approveMaintenance(1L, req))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("previous interval");
+    }
+
+    @Test
+    void approveMaintenance_newIntervalNotGreaterThanCurrentMileage_throwsConflict() {
+        // No security context needed — service throws before reaching the authenticated-user lookup
+        // Vehicle at 10,000 km — new interval of 9,000 is already behind the odometer
+        Vehicle vehicle = vehicle(10L, 10000.0, 5000.0);
+        MaintenanceFlag flag = flagWithStatus(1L, vehicle, FlagStatus.PENDING_APPROVAL);
+        when(maintenanceFlagRepository.findById(1L)).thenReturn(Optional.of(flag));
+
+        ApproveFlagRequest req = new ApproveFlagRequest();
+        req.setNewMilestoneInterval(9000.0);
+        req.setServiceNotes("notes");
+
+        assertThatThrownBy(() -> maintenanceFlagService.approveMaintenance(1L, req))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("current mileage");
+    }
+
+    @Test
+    void approveMaintenance_flagNotFound_throwsResourceNotFound() {
         when(maintenanceFlagRepository.findById(999L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> maintenanceFlagService.resolveFlag(999L))
+        ApproveFlagRequest req = new ApproveFlagRequest();
+        req.setNewMilestoneInterval(8000.0);
+        req.setServiceNotes("notes");
+
+        assertThatThrownBy(() -> maintenanceFlagService.approveMaintenance(999L, req))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
@@ -314,10 +423,10 @@ class MaintenanceFlagServiceTest {
         SecurityContextHolder.setContext(ctx);
     }
 
-    private Vehicle vehicle(Long id) {
+    private Vehicle vehicle(Long id, Double currentMileage, Double milestoneInterval) {
         return Vehicle.builder().id(id).make("Toyota").model("Hilux")
                 .plateNumber("VEH-" + id).status(VehicleStatus.MAINTENANCE)
-                .currentMileage(10000.0).milestoneInterval(5000.0).build();
+                .currentMileage(currentMileage).milestoneInterval(milestoneInterval).build();
     }
 
     private User maintenanceUser(Long id, String email) {

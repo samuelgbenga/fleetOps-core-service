@@ -3,18 +3,20 @@ package com.fleetops.core.vehicle.service;
 import com.fleetops.core.exception.ConflictException;
 import com.fleetops.core.exception.ResourceNotFoundException;
 import com.fleetops.core.vehicle.dto.MilestoneIntervalRequest;
-import com.fleetops.core.vehicle.dto.ServiceHistoryRequest;
 import com.fleetops.core.vehicle.dto.VehicleRequest;
 import com.fleetops.core.vehicle.dto.VehicleResponse;
 import com.fleetops.core.vehicle.entity.Vehicle;
 import com.fleetops.core.vehicle.enums.VehicleStatus;
+import com.fleetops.core.vehicle.repository.ServiceHistoryRepository;
 import com.fleetops.core.vehicle.repository.VehicleRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Optional;
@@ -28,7 +30,14 @@ import static org.mockito.Mockito.*;
 class VehicleServiceTest {
 
     @Mock private VehicleRepository vehicleRepository;
+    @Mock private ServiceHistoryRepository serviceHistoryRepository;
+
     @InjectMocks private VehicleService vehicleService;
+
+    @BeforeEach
+    void injectConfig() {
+        ReflectionTestUtils.setField(vehicleService, "defaultMilestoneInterval", 3000.0);
+    }
 
     // ── registerVehicle ──────────────────────────────────────────────────────
 
@@ -68,7 +77,26 @@ class VehicleServiceTest {
 
         ArgumentCaptor<Vehicle> captor = ArgumentCaptor.forClass(Vehicle.class);
         verify(vehicleRepository).save(captor.capture());
-        assertThat(captor.getValue().getMilestoneInterval()).isEqualTo(5000.0);
+        assertThat(captor.getValue().getMilestoneInterval()).isEqualTo(3000.0);
+    }
+
+    @Test
+    void registerVehicle_customMilestoneInterval_respected() {
+        VehicleRequest req = new VehicleRequest();
+        req.setMake("Isuzu");
+        req.setModel("NPR");
+        req.setPlateNumber("LAG-500-AA");
+        req.setMilestoneInterval(7500.0);
+
+        Vehicle saved = vehicle(3L, "Isuzu", "NPR", "LAG-500-AA", VehicleStatus.AVAILABLE);
+        when(vehicleRepository.existsByPlateNumber("LAG-500-AA")).thenReturn(false);
+        when(vehicleRepository.save(any())).thenReturn(saved);
+
+        vehicleService.registerVehicle(req);
+
+        ArgumentCaptor<Vehicle> captor = ArgumentCaptor.forClass(Vehicle.class);
+        verify(vehicleRepository).save(captor.capture());
+        assertThat(captor.getValue().getMilestoneInterval()).isEqualTo(7500.0);
     }
 
     @Test
@@ -105,6 +133,17 @@ class VehicleServiceTest {
         assertThat(vehicleService.getAllVehicles()).isEmpty();
     }
 
+    @Test
+    void getAllVehicles_serviceHistories_alwaysEmpty() {
+        when(vehicleRepository.findAll()).thenReturn(List.of(
+                vehicle(1L, "Toyota", "Camry", "AAA-001", VehicleStatus.AVAILABLE)
+        ));
+
+        List<VehicleResponse> result = vehicleService.getAllVehicles();
+
+        assertThat(result.get(0).getServiceHistories()).isEmpty();
+    }
+
     // ── getAvailableVehicles ─────────────────────────────────────────────────
 
     @Test
@@ -122,14 +161,17 @@ class VehicleServiceTest {
     // ── getVehicleById ───────────────────────────────────────────────────────
 
     @Test
-    void getVehicleById_found_returnsResponse() {
-        when(vehicleRepository.findById(1L))
-                .thenReturn(Optional.of(vehicle(1L, "Toyota", "Camry", "AAA-001", VehicleStatus.AVAILABLE)));
+    void getVehicleById_found_returnsResponseWithServiceHistories() {
+        Vehicle v = vehicle(1L, "Toyota", "Camry", "AAA-001", VehicleStatus.AVAILABLE);
+        when(vehicleRepository.findById(1L)).thenReturn(Optional.of(v));
+        when(serviceHistoryRepository.findByVehicleIdOrderByServicedAtDesc(1L))
+                .thenReturn(List.of());
 
         VehicleResponse response = vehicleService.getVehicleById(1L);
 
         assertThat(response.getId()).isEqualTo(1L);
         assertThat(response.getPlateNumber()).isEqualTo("AAA-001");
+        assertThat(response.getServiceHistories()).isEmpty();
     }
 
     @Test
@@ -141,34 +183,6 @@ class VehicleServiceTest {
                 .hasMessageContaining("99");
     }
 
-    // ── updateServiceHistory ─────────────────────────────────────────────────
-
-    @Test
-    void updateServiceHistory_success_updatesAndReturns() {
-        Vehicle existing = vehicle(1L, "Toyota", "Camry", "AAA-001", VehicleStatus.AVAILABLE);
-        when(vehicleRepository.findById(1L)).thenReturn(Optional.of(existing));
-        when(vehicleRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-
-        ServiceHistoryRequest req = new ServiceHistoryRequest();
-        req.setServiceHistory("Oil changed at 10,000 km");
-
-        VehicleResponse response = vehicleService.updateServiceHistory(1L, req);
-
-        assertThat(response.getServiceHistory()).isEqualTo("Oil changed at 10,000 km");
-        verify(vehicleRepository).save(existing);
-    }
-
-    @Test
-    void updateServiceHistory_vehicleNotFound_throwsResourceNotFound() {
-        when(vehicleRepository.findById(99L)).thenReturn(Optional.empty());
-
-        ServiceHistoryRequest req = new ServiceHistoryRequest();
-        req.setServiceHistory("notes");
-
-        assertThatThrownBy(() -> vehicleService.updateServiceHistory(99L, req))
-                .isInstanceOf(ResourceNotFoundException.class);
-    }
-
     // ── updateMilestoneInterval ──────────────────────────────────────────────
 
     @Test
@@ -178,11 +192,11 @@ class VehicleServiceTest {
         when(vehicleRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         MilestoneIntervalRequest req = new MilestoneIntervalRequest();
-        req.setMilestoneInterval(3000.0);
+        req.setMilestoneInterval(6000.0);
 
         VehicleResponse response = vehicleService.updateMilestoneInterval(1L, req);
 
-        assertThat(response.getMilestoneInterval()).isEqualTo(3000.0);
+        assertThat(response.getMilestoneInterval()).isEqualTo(6000.0);
         verify(vehicleRepository).save(existing);
     }
 
@@ -202,7 +216,7 @@ class VehicleServiceTest {
     private Vehicle vehicle(Long id, String make, String model, String plate, VehicleStatus status) {
         return Vehicle.builder()
                 .id(id).make(make).model(model).plateNumber(plate)
-                .currentMileage(0.0).milestoneInterval(5000.0).status(status)
+                .currentMileage(0.0).milestoneInterval(3000.0).status(status)
                 .build();
     }
 }

@@ -34,15 +34,12 @@ public class Vehicle {
 
     @Column(name = "milestone_interval", nullable = false)
     @Builder.Default
-    private Double milestoneInterval = 5000.0;
+    private Double milestoneInterval = 3000.0;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
     private VehicleStatus status = VehicleStatus.AVAILABLE;
-
-    @Column(name = "service_history", columnDefinition = "TEXT")
-    private String serviceHistory;
 
     @Column(name = "registered_at", nullable = false, updatable = false)
     private LocalDateTime registeredAt;

@@ -14,24 +14,18 @@ public class MileageLogResponse {
     private String plateNumber;
     private Long submittedById;
     private String submittedByName;
-    private Double mileageAdded;
-    private Double newTotalMileage;
+    private Double reportedMileage;
     private LocalDateTime loggedAt;
 
-    public static MileageLogResponse from(MileageLog log, Double newTotal) {
+    public static MileageLogResponse from(MileageLog log) {
         return MileageLogResponse.builder()
                 .id(log.getId())
                 .vehicleId(log.getVehicle().getId())
                 .plateNumber(log.getVehicle().getPlateNumber())
                 .submittedById(log.getSubmittedBy().getId())
                 .submittedByName(log.getSubmittedBy().getName())
-                .mileageAdded(log.getMileageAdded())
-                .newTotalMileage(newTotal)
+                .reportedMileage(log.getReportedMileage())
                 .loggedAt(log.getLoggedAt())
                 .build();
-    }
-
-    public static MileageLogResponse from(MileageLog log) {
-        return from(log, log.getMileageAfter());
     }
 }

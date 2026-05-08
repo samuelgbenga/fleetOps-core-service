@@ -1,5 +1,6 @@
 package com.fleetops.core.mileage.service;
 
+import com.fleetops.core.exception.ConflictException;
 import com.fleetops.core.exception.ResourceNotFoundException;
 import com.fleetops.core.kafka.event.MaintenanceFlagCreatedEvent;
 import com.fleetops.core.kafka.producer.MaintenanceEventProducer;
@@ -51,9 +52,10 @@ class MileageLogServiceTest {
     // ── submitLog ────────────────────────────────────────────────────────────
 
     @Test
-    void submitLog_success_updatesVehicleMileageAndSavesLog() {
+    void submitLog_success_setsOdometerDirectlyAndSavesLog() {
         mockSecurityContext("staff@fleetops.com");
         User staff = staff(1L, "staff@fleetops.com");
+        // Vehicle currently at 4,000 km — field staff reports odometer reading of 4,500
         Vehicle vehicle = vehicle(10L, 4000.0, 5000.0);
 
         when(userRepository.findByEmail("staff@fleetops.com")).thenReturn(Optional.of(staff));
@@ -61,10 +63,9 @@ class MileageLogServiceTest {
         when(vehicleRepository.save(any())).thenAnswer(i -> i.getArgument(0));
         when(mileageLogRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-        MileageLogResponse response = mileageLogService.submitLog(logRequest(10L, 500.0));
+        MileageLogResponse response = mileageLogService.submitLog(logRequest(10L, 4500.0));
 
-        assertThat(response.getMileageAdded()).isEqualTo(500.0);
-        assertThat(response.getNewTotalMileage()).isEqualTo(4500.0);
+        assertThat(response.getReportedMileage()).isEqualTo(4500.0);
         assertThat(vehicle.getCurrentMileage()).isEqualTo(4500.0);
         verify(mileageLogRepository).save(any(MileageLog.class));
         verify(maintenanceEventProducer, never()).publish(any());
@@ -75,7 +76,7 @@ class MileageLogServiceTest {
         mockSecurityContext("staff@fleetops.com");
         User staff = staff(1L, "staff@fleetops.com");
         User manager = manager(2L, "manager@fleetops.com");
-        // old=4900, add=200 → new=5100 → milestone crossed (floor(4900/5000)=0, floor(5100/5000)=1)
+        // Vehicle currently at 4,900 km — odometer now reads 5,100 → crosses the 5,000 km milestone
         Vehicle vehicle = vehicle(10L, 4900.0, 5000.0);
 
         when(userRepository.findByEmail("staff@fleetops.com")).thenReturn(Optional.of(staff));
@@ -84,7 +85,7 @@ class MileageLogServiceTest {
         when(mileageLogRepository.save(any())).thenAnswer(i -> i.getArgument(0));
         when(userRepository.findByRole(UserRole.FLEET_MANAGER)).thenReturn(List.of(manager));
 
-        mileageLogService.submitLog(logRequest(10L, 200.0));
+        mileageLogService.submitLog(logRequest(10L, 5100.0));
 
         ArgumentCaptor<MaintenanceFlagCreatedEvent> captor =
                 ArgumentCaptor.forClass(MaintenanceFlagCreatedEvent.class);
@@ -98,7 +99,7 @@ class MileageLogServiceTest {
     @Test
     void submitLog_milestoneNotReached_doesNotPublish() {
         mockSecurityContext("staff@fleetops.com");
-        // old=4000, add=100 → new=4100 — same interval block, no crossing
+        // old=4000, reported=4100 — same 5,000 km interval block, no crossing
         Vehicle vehicle = vehicle(10L, 4000.0, 5000.0);
 
         when(userRepository.findByEmail("staff@fleetops.com")).thenReturn(Optional.of(staff(1L, "staff@fleetops.com")));
@@ -106,13 +107,13 @@ class MileageLogServiceTest {
         when(vehicleRepository.save(any())).thenAnswer(i -> i.getArgument(0));
         when(mileageLogRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-        mileageLogService.submitLog(logRequest(10L, 100.0));
+        mileageLogService.submitLog(logRequest(10L, 4100.0));
 
         verify(maintenanceEventProducer, never()).publish(any());
     }
 
     @Test
-    void submitLog_milestoneReached_noFleetManager_logsWarnDoesNotPublish() {
+    void submitLog_milestoneReached_noFleetManager_doesNotPublish() {
         mockSecurityContext("staff@fleetops.com");
         Vehicle vehicle = vehicle(10L, 4900.0, 5000.0);
 
@@ -122,9 +123,42 @@ class MileageLogServiceTest {
         when(mileageLogRepository.save(any())).thenAnswer(i -> i.getArgument(0));
         when(userRepository.findByRole(UserRole.FLEET_MANAGER)).thenReturn(List.of());
 
-        mileageLogService.submitLog(logRequest(10L, 200.0));
+        mileageLogService.submitLog(logRequest(10L, 5100.0));
 
         verify(maintenanceEventProducer, never()).publish(any());
+    }
+
+    @Test
+    void submitLog_reportedMileageLowerThanCurrent_throwsConflict() {
+        mockSecurityContext("staff@fleetops.com");
+        // Vehicle recorded at 5,000 km — submitting 4,800 is going backwards
+        Vehicle vehicle = vehicle(10L, 5000.0, 8000.0);
+
+        when(userRepository.findByEmail("staff@fleetops.com")).thenReturn(Optional.of(staff(1L, "staff@fleetops.com")));
+        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+
+        assertThatThrownBy(() -> mileageLogService.submitLog(logRequest(10L, 4800.0)))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("4800")
+                .hasMessageContaining("5000");
+        verify(mileageLogRepository, never()).save(any());
+    }
+
+    @Test
+    void submitLog_reportedMileageEqualToCurrent_accepted() {
+        mockSecurityContext("staff@fleetops.com");
+        // Reporting the same mileage again is allowed (idempotent re-submission)
+        Vehicle vehicle = vehicle(10L, 5000.0, 8000.0);
+
+        when(userRepository.findByEmail("staff@fleetops.com")).thenReturn(Optional.of(staff(1L, "staff@fleetops.com")));
+        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+        when(vehicleRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(mileageLogRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        MileageLogResponse response = mileageLogService.submitLog(logRequest(10L, 5000.0));
+
+        assertThat(response.getReportedMileage()).isEqualTo(5000.0);
+        verify(mileageLogRepository).save(any());
     }
 
     @Test
@@ -156,11 +190,11 @@ class MileageLogServiceTest {
 
         MileageLog log1 = MileageLog.builder()
                 .id(1L).vehicle(vehicle).submittedBy(staff)
-                .mileageAdded(1000.0).mileageAfter(6000.0)
+                .reportedMileage(6000.0)
                 .loggedAt(LocalDateTime.now()).build();
         MileageLog log2 = MileageLog.builder()
                 .id(2L).vehicle(vehicle).submittedBy(staff)
-                .mileageAdded(500.0).mileageAfter(5500.0)
+                .reportedMileage(5500.0)
                 .loggedAt(LocalDateTime.now().minusDays(1)).build();
 
         when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
@@ -170,8 +204,8 @@ class MileageLogServiceTest {
         List<MileageLogResponse> result = mileageLogService.getLogsByVehicle(10L);
 
         assertThat(result).hasSize(2);
-        assertThat(result.get(0).getMileageAdded()).isEqualTo(1000.0);
-        assertThat(result.get(0).getNewTotalMileage()).isEqualTo(6000.0);
+        assertThat(result.get(0).getReportedMileage()).isEqualTo(6000.0);
+        assertThat(result.get(1).getReportedMileage()).isEqualTo(5500.0);
         assertThat(result.get(0).getSubmittedByName()).isEqualTo("Field Staff");
     }
 
@@ -218,10 +252,10 @@ class MileageLogServiceTest {
                 .currentMileage(currentMileage).milestoneInterval(milestoneInterval).build();
     }
 
-    private MileageLogRequest logRequest(Long vehicleId, Double mileageAdded) {
+    private MileageLogRequest logRequest(Long vehicleId, Double reportedMileage) {
         MileageLogRequest req = new MileageLogRequest();
         req.setVehicleId(vehicleId);
-        req.setMileageAdded(mileageAdded);
+        req.setReportedMileage(reportedMileage);
         return req;
     }
 }

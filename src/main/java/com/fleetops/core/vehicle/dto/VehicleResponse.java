@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -17,7 +18,7 @@ public class VehicleResponse {
     private Double currentMileage;
     private Double milestoneInterval;
     private VehicleStatus status;
-    private String serviceHistory;
+    private List<ServiceHistoryResponse> serviceHistories;
     private LocalDateTime registeredAt;
 
     public static VehicleResponse from(Vehicle v) {
@@ -29,7 +30,21 @@ public class VehicleResponse {
                 .currentMileage(v.getCurrentMileage())
                 .milestoneInterval(v.getMilestoneInterval())
                 .status(v.getStatus())
-                .serviceHistory(v.getServiceHistory())
+                .serviceHistories(List.of())
+                .registeredAt(v.getRegisteredAt())
+                .build();
+    }
+
+    public static VehicleResponse from(Vehicle v, List<ServiceHistoryResponse> histories) {
+        return VehicleResponse.builder()
+                .id(v.getId())
+                .make(v.getMake())
+                .model(v.getModel())
+                .plateNumber(v.getPlateNumber())
+                .currentMileage(v.getCurrentMileage())
+                .milestoneInterval(v.getMilestoneInterval())
+                .status(v.getStatus())
+                .serviceHistories(histories)
                 .registeredAt(v.getRegisteredAt())
                 .build();
     }

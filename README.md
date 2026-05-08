@@ -17,6 +17,7 @@ Swagger UI (interactive docs): `http://localhost:8080/swagger-ui/index.html`
 
 - [Auth](#auth)
 - [Users](#users)
+- [Password Management](#password-management)
 - [Vehicles](#vehicles)
 - [Trip Requests](#trip-requests)
 - [Mileage Logs](#mileage-logs)
@@ -31,6 +32,8 @@ Swagger UI (interactive docs): `http://localhost:8080/swagger-ui/index.html`
 
 ### `POST /api/auth/login`
 **Role:** Public
+
+**Errors:** Returns `401` for wrong email or password (not 500).
 
 **Sample 1 — Admin login**
 ```json
@@ -59,10 +62,55 @@ Swagger UI (interactive docs): `http://localhost:8080/swagger-ui/index.html`
 
 ---
 
+## Password Management
+
+### `PATCH /api/auth/change-password`
+**Role:** Any authenticated user
+
+The user must supply their current password for verification. Returns `401` if the current password is wrong.
+
+```json
+{
+  "currentPassword": "OldPass@123",
+  "newPassword": "NewPass@456"
+}
+```
+
+**Response:** `204 No Content`
+
+---
+
+### `PATCH /api/admin/users/{id}/reset-password`
+**Role:** `ADMIN`
+
+Hard-sets any user's password without requiring the current one. Use this for account recovery.
+
+**Sample 1**
+```json
+{
+  "newPassword": "Reset@1234"
+}
+```
+
+**Sample 2**
+```json
+{
+  "newPassword": "Recover@5678"
+}
+```
+
+**Response:** `204 No Content`. Returns `404` if the user ID does not exist.
+
+---
+
 ## Users
 
 ### `POST /api/admin/users`
 **Role:** `ADMIN`
+
+> Available roles: `FIELD_STAFF` · `FLEET_MANAGER` · `MAINTENANCE_TEAM` · `ADMIN`
+>
+> Passing an invalid role value returns `400` with a message listing the accepted values.
 
 **Sample 1 — Create a Field Staff**
 ```json
@@ -84,41 +132,38 @@ Swagger UI (interactive docs): `http://localhost:8080/swagger-ui/index.html`
 }
 ```
 
-> Available roles: `FIELD_STAFF` · `FLEET_MANAGER` · `MAINTENANCE_TEAM` · `ADMIN`
+**Sample 3 — Create a Maintenance Team member**
+```json
+{
+  "name": "Emeka Nwosu",
+  "email": "emeka.nwosu@fleetops.com",
+  "password": "Maint@1234",
+  "role": "MAINTENANCE_TEAM"
+}
+```
 
 ---
 
 ### `GET /api/admin/users`
 **Role:** `ADMIN`
 
-```
-GET /api/admin/users
-Authorization: Bearer <token>
-```
-
 ---
 
 ### `GET /api/admin/users/{id}`
 **Role:** `ADMIN`
 
-**Sample 1**
-```
-GET /api/admin/users/1
-```
-
-**Sample 2**
-```
-GET /api/admin/users/5
-```
-
 ---
 
 ## Vehicles
 
-### `POST /api/vehicles`
-**Role:** `FLEET_MANAGER`
+Each vehicle has a **milestone interval** — the odometer reading (km) at which a maintenance flag is automatically raised. The default is **3,000 km** (configurable via `DEFAULT_MILESTONE_INTERVAL` env var). This can be overridden per vehicle at creation time or updated later.
 
-**Sample 1 — Default 5,000 km milestone**
+Service history is recorded automatically when the fleet manager approves a completed maintenance. See [Maintenance Flags](#maintenance-flags).
+
+### `POST /api/vehicles`
+**Role:** `FLEET_MANAGER`, `ADMIN`
+
+**Sample 1 — Use default 3,000 km milestone**
 ```json
 {
   "make": "Toyota",
@@ -127,13 +172,13 @@ GET /api/admin/users/5
 }
 ```
 
-**Sample 2 — Custom 3,000 km milestone**
+**Sample 2 — Custom milestone**
 ```json
 {
   "make": "Ford",
   "model": "Ranger",
   "plateNumber": "ABJ-112-FCT",
-  "milestoneInterval": 3000
+  "milestoneInterval": 5000
 }
 ```
 
@@ -142,52 +187,52 @@ GET /api/admin/users/5
 ### `GET /api/vehicles`
 **Role:** `FLEET_MANAGER`, `ADMIN`
 
-```
-GET /api/vehicles
-Authorization: Bearer <token>
-```
+Returns all vehicles. `serviceHistories` is always an empty list on list responses — use `GET /api/vehicles/{id}` for full history.
 
 ---
 
 ### `GET /api/vehicles/available`
 **Role:** `FIELD_STAFF`, `FLEET_MANAGER`, `ADMIN`
 
-```
-GET /api/vehicles/available
-Authorization: Bearer <token>
-```
+Returns vehicles with status `AVAILABLE`. Vehicles under maintenance or currently assigned are excluded.
 
 ---
 
 ### `GET /api/vehicles/{id}`
 **Role:** `FLEET_MANAGER`, `ADMIN`
 
-**Sample 1**
-```
-GET /api/vehicles/1
-```
+Returns the vehicle with its full service history (most recent first).
 
-**Sample 2**
-```
-GET /api/vehicles/4
+**Sample Response**
+```json
+{
+  "id": 1,
+  "make": "Toyota",
+  "model": "Land Cruiser",
+  "plateNumber": "LG-245-KJA",
+  "currentMileage": 6200.0,
+  "milestoneInterval": 6000.0,
+  "status": "AVAILABLE",
+  "serviceHistories": [
+    {
+      "id": 1,
+      "fleetManagerName": "Sarah Okonkwo",
+      "notes": "Engine oil replaced. Brake pads inspected and cleared.",
+      "newMilestoneInterval": 6000.0,
+      "servicedAt": "2026-04-20T14:30:00"
+    }
+  ],
+  "registeredAt": "2026-01-10T09:00:00"
+}
 ```
 
 ---
 
 ### `PATCH /api/vehicles/{id}/milestone-interval`
-**Role:** `FLEET_MANAGER`
+**Role:** `FLEET_MANAGER`, `ADMIN`
 
-Updates the mileage threshold that triggers a maintenance flag for a vehicle.
-The new interval takes effect on the next mileage log submission.
+Manually updates the mileage threshold that triggers a maintenance flag. Takes effect on the next mileage log submission.
 
-**Sample 1 — Set to 3,000 km**
-```json
-{
-  "milestoneInterval": 3000
-}
-```
-
-**Sample 2 — Reset to default 5,000 km**
 ```json
 {
   "milestoneInterval": 5000
@@ -196,26 +241,13 @@ The new interval takes effect on the next mileage log submission.
 
 ---
 
-### `PATCH /api/vehicles/{id}/service-history`
-**Role:** `FLEET_MANAGER`
-
-**Sample 1 — Log an oil change**
-```json
-{
-  "serviceHistory": "Oil and filter changed at 10,000 km on 2025-04-15. Next service due at 15,000 km."
-}
-```
-
-**Sample 2 — Log a full inspection**
-```json
-{
-  "serviceHistory": "Full inspection on 2025-05-01. Brake pads replaced, tyres rotated. Cleared for operation."
-}
-```
-
----
-
 ## Trip Requests
+
+A field staff member submits a trip request for a specific vehicle and date range. Rules:
+- The vehicle must be `AVAILABLE`.
+- The same field staff cannot have two `PENDING` requests for the same vehicle simultaneously.
+- When a request is approved, all other `PENDING` requests for that vehicle whose `startDate` falls before the approved trip's `endDate` are automatically rejected.
+- A cron job runs daily at midnight to auto-reject any `PENDING` requests whose `startDate` has already passed.
 
 ### `POST /api/trip-requests`
 **Role:** `FIELD_STAFF`
@@ -225,8 +257,8 @@ The new interval takes effect on the next mileage log submission.
 {
   "vehicleId": 2,
   "destination": "Lagos Island",
-  "startDate": "2025-06-10",
-  "endDate": "2025-06-12"
+  "startDate": "2026-07-10",
+  "endDate": "2026-07-12"
 }
 ```
 
@@ -235,8 +267,8 @@ The new interval takes effect on the next mileage log submission.
 {
   "vehicleId": 5,
   "destination": "Abuja Central Depot",
-  "startDate": "2025-06-20",
-  "endDate": "2025-06-23"
+  "startDate": "2026-07-20",
+  "endDate": "2026-07-23"
 }
 ```
 
@@ -245,168 +277,122 @@ The new interval takes effect on the next mileage log submission.
 ### `GET /api/trip-requests`
 **Role:** `FLEET_MANAGER` — returns `PENDING` requests only
 
-```
-GET /api/trip-requests
-Authorization: Bearer <token>
-```
-
 ---
 
 ### `GET /api/trip-requests/all`
 **Role:** `FLEET_MANAGER`, `ADMIN` — returns all requests across all statuses
-
-```
-GET /api/trip-requests/all
-Authorization: Bearer <token>
-```
 
 ---
 
 ### `GET /api/trip-requests/my`
 **Role:** `FIELD_STAFF` — returns the authenticated user's own requests
 
-```
-GET /api/trip-requests/my
-Authorization: Bearer <token>
-```
-
 ---
 
 ### `PATCH /api/trip-requests/{id}/approve`
 **Role:** `FLEET_MANAGER`
 
-**Sample 1**
-```
-PATCH /api/trip-requests/3/approve
-Authorization: Bearer <token>
-```
-
-**Sample 2**
-```
-PATCH /api/trip-requests/7/approve
-Authorization: Bearer <token>
-```
-
-> Approving a request creates a `VehicleAssignment` and sets the vehicle status to `ASSIGNED`.
+Approves a `PENDING` trip request. Creates a `VehicleAssignment`, sets the vehicle status to `ASSIGNED`, and auto-rejects conflicting pending requests for the same vehicle.
 
 ---
 
 ### `PATCH /api/trip-requests/{id}/reject`
 **Role:** `FLEET_MANAGER`
 
-**Sample 1**
-```
-PATCH /api/trip-requests/4/reject
-Authorization: Bearer <token>
-```
-
-**Sample 2**
-```
-PATCH /api/trip-requests/9/reject
-Authorization: Bearer <token>
-```
-
 ---
 
 ### `PATCH /api/trip-requests/{id}/complete`
 **Role:** `FLEET_MANAGER`
 
-**Sample 1**
-```
-PATCH /api/trip-requests/3/complete
-Authorization: Bearer <token>
-```
-
-**Sample 2**
-```
-PATCH /api/trip-requests/7/complete
-Authorization: Bearer <token>
-```
-
-> Completing a trip sets the vehicle status back to `AVAILABLE`.
+Marks an `APPROVED` trip as completed. Sets the vehicle status back to `AVAILABLE`.
 
 ---
 
 ## Mileage Logs
 
+After a trip is completed, the field staff submits the vehicle's current **odometer reading**. This is not a per-trip delta — it is the absolute reading from the vehicle's odometer. The system sets the vehicle's `currentMileage` directly to this value.
+
+If the new reading causes the vehicle to cross its configured `milestoneInterval`, a `MaintenanceFlagCreatedEvent` is published to Kafka. The consumer creates a maintenance flag, sets the vehicle to `MAINTENANCE` (blocking future trip requests), and notifies the fleet manager — all asynchronously.
+
 ### `POST /api/mileage-logs`
 **Role:** `FIELD_STAFF`
 
-**Sample 1 — Routine post-trip update**
+**Sample 1 — Odometer now reads 3,200 km**
 ```json
 {
   "vehicleId": 2,
-  "mileageAdded": 320.5
+  "reportedMileage": 3200.0
 }
 ```
 
-**Sample 2 — Long-distance trip**
+**Sample 2 — Odometer now reads 5,850 km (crosses 5,000 km milestone)**
 ```json
 {
   "vehicleId": 5,
-  "mileageAdded": 1450.0
+  "reportedMileage": 5850.0
 }
 ```
 
-> If this submission causes the vehicle to cross a mileage milestone (e.g. every 5,000 km), a
-> `MaintenanceFlagCreatedEvent` is published to Kafka. The consumer creates a maintenance flag
-> and notifies the fleet manager automatically.
+> The reported value must be greater than or equal to the vehicle's currently recorded mileage. Submitting a lower value returns `409`.
+
+**Response**
+```json
+{
+  "id": 12,
+  "vehicleId": 2,
+  "plateNumber": "LG-245-KJA",
+  "submittedById": 3,
+  "submittedByName": "John Adeyemi",
+  "reportedMileage": 3200.0,
+  "loggedAt": "2026-05-08T10:15:00"
+}
+```
 
 ---
 
 ### `GET /api/mileage-logs/vehicle/{vehicleId}`
-**Role:** `FLEET_MANAGER`, `ADMIN`
-
-**Sample 1**
-```
-GET /api/mileage-logs/vehicle/2
-Authorization: Bearer <token>
-```
-
-**Sample 2**
-```
-GET /api/mileage-logs/vehicle/5
-Authorization: Bearer <token>
-```
+**Role:** `FLEET_MANAGER`, `ADMIN` — returns logs newest first
 
 ---
 
 ## Maintenance Flags
 
-### `GET /api/maintenance-flags`
-**Role:** `FLEET_MANAGER`, `ADMIN`
+A maintenance flag is raised automatically when a vehicle crosses its mileage milestone. The full lifecycle is:
 
 ```
-GET /api/maintenance-flags
-Authorization: Bearer <token>
+OPEN → ASSIGNED → IN_PROGRESS → PENDING_APPROVAL → RESOLVED
 ```
+
+| Status | Who sets it | How |
+|---|---|---|
+| `OPEN` | System (Kafka consumer) | Mileage milestone crossed |
+| `ASSIGNED` | Fleet manager / Admin | `PATCH /{id}/assign` |
+| `IN_PROGRESS` | Maintenance team | `PATCH /{id}/progress` |
+| `PENDING_APPROVAL` | Maintenance team | `PATCH /{id}/done` — notifies fleet manager by email |
+| `RESOLVED` | Fleet manager / Admin | `PATCH /{id}/approve` — requires new milestone + service notes |
+
+> A vehicle blocked by a maintenance flag cannot receive new trip requests until the flag is `RESOLVED`.
+
+---
+
+### `GET /api/maintenance-flags`
+**Role:** `FLEET_MANAGER`, `ADMIN`
 
 ---
 
 ### `GET /api/maintenance-flags/my`
 **Role:** `MAINTENANCE_TEAM` — returns flags assigned to the current user
 
-```
-GET /api/maintenance-flags/my
-Authorization: Bearer <token>
-```
-
 ---
 
 ### `PATCH /api/maintenance-flags/{id}/assign`
-**Role:** `FLEET_MANAGER`
+**Role:** `FLEET_MANAGER`, `ADMIN`
 
-**Sample 1**
+Assigns an `OPEN` flag to a maintenance team member. Sends them an email notification.
+
 ```json
 {
   "maintenanceTeamUserId": 4
-}
-```
-
-**Sample 2**
-```json
-{
-  "maintenanceTeamUserId": 7
 }
 ```
 
@@ -415,14 +401,16 @@ Authorization: Bearer <token>
 ### `PATCH /api/maintenance-flags/{id}/progress`
 **Role:** `MAINTENANCE_TEAM`
 
+Updates progress notes and moves the flag to `IN_PROGRESS`. Notifies the assigned fleet manager.
+
 **Sample 1 — Initial update**
 ```json
 {
-  "progressNotes": "Vehicle inspected. Engine oil and filter replaced. Awaiting brake pad delivery before completing service."
+  "progressNotes": "Vehicle inspected. Engine oil and filter replaced. Awaiting brake pad delivery."
 }
 ```
 
-**Sample 2 — Follow-up update**
+**Sample 2 — Follow-up**
 ```json
 {
   "progressNotes": "Brake pads replaced. Final checks in progress. Vehicle expected ready by end of day."
@@ -431,22 +419,42 @@ Authorization: Bearer <token>
 
 ---
 
-### `PATCH /api/maintenance-flags/{id}/resolve`
+### `PATCH /api/maintenance-flags/{id}/done`
 **Role:** `MAINTENANCE_TEAM`
 
-**Sample 1**
+Signals that work is complete. Moves the flag to `PENDING_APPROVAL` and sends an email to the fleet manager requesting approval.
+
 ```
-PATCH /api/maintenance-flags/1/resolve
+PATCH /api/maintenance-flags/1/done
 Authorization: Bearer <token>
+```
+
+---
+
+### `PATCH /api/maintenance-flags/{id}/approve`
+**Role:** `FLEET_MANAGER`, `ADMIN`
+
+Approves a `PENDING_APPROVAL` flag. Requires:
+- `newMilestoneInterval` — must be greater than both the previous milestone interval and the vehicle's current mileage
+- `serviceNotes` — description of the work done (stored as a service history record on the vehicle)
+
+On success: creates a `ServiceHistory` record, updates the vehicle's milestone interval, sets the vehicle to `AVAILABLE`, and notifies the maintenance team member.
+
+**Sample 1**
+```json
+{
+  "newMilestoneInterval": 6000,
+  "serviceNotes": "Full service at 3,200 km. Engine oil, oil filter, and air filter replaced. Brake pads inspected — within tolerance."
+}
 ```
 
 **Sample 2**
+```json
+{
+  "newMilestoneInterval": 10000,
+  "serviceNotes": "Major service at 5,850 km. Timing belt, spark plugs, and coolant replaced. All systems cleared."
+}
 ```
-PATCH /api/maintenance-flags/6/resolve
-Authorization: Bearer <token>
-```
-
-> Resolving a flag automatically sets the vehicle status back to `AVAILABLE` and notifies the fleet manager.
 
 ---
 
@@ -455,17 +463,7 @@ Authorization: Bearer <token>
 ### `GET /api/assignments/vehicle/{vehicleId}`
 **Role:** `FLEET_MANAGER`, `ADMIN`
 
-**Sample 1**
-```
-GET /api/assignments/vehicle/2
-Authorization: Bearer <token>
-```
-
-**Sample 2**
-```
-GET /api/assignments/vehicle/5
-Authorization: Bearer <token>
-```
+Returns the assignment history for a vehicle.
 
 ---
 
@@ -473,11 +471,6 @@ Authorization: Bearer <token>
 
 ### `GET /api/admin/reports/utilisation`
 **Role:** `ADMIN`
-
-```
-GET /api/admin/reports/utilisation
-Authorization: Bearer <token>
-```
 
 **Sample Response**
 ```json
@@ -496,11 +489,6 @@ Authorization: Bearer <token>
 ### `GET /api/admin/reports/vehicle-health`
 **Role:** `ADMIN`, `FLEET_MANAGER`
 
-```
-GET /api/admin/reports/vehicle-health
-Authorization: Bearer <token>
-```
-
 **Sample Response**
 ```json
 [
@@ -509,8 +497,8 @@ Authorization: Bearer <token>
     "plateNumber": "LG-245-KJA",
     "make": "Toyota",
     "model": "Land Cruiser",
-    "currentMileage": 12450.0,
-    "milestoneInterval": 5000.0,
+    "currentMileage": 3200.0,
+    "milestoneInterval": 6000.0,
     "status": "AVAILABLE",
     "openMaintenanceFlags": 0
   },
@@ -519,8 +507,8 @@ Authorization: Bearer <token>
     "plateNumber": "ABJ-112-FCT",
     "make": "Ford",
     "model": "Ranger",
-    "currentMileage": 9800.0,
-    "milestoneInterval": 3000.0,
+    "currentMileage": 5850.0,
+    "milestoneInterval": 5000.0,
     "status": "MAINTENANCE",
     "openMaintenanceFlags": 1
   }
@@ -532,23 +520,28 @@ Authorization: Bearer <token>
 ## Quick-Start Flow
 
 ```
- 1. Login as ADMIN           POST /api/auth/login
- 2. Create users             POST /api/admin/users          (one per role needed)
- 3. Login as FLEET_MANAGER   POST /api/auth/login
- 4. Register vehicles        POST /api/vehicles
- 5. Login as FIELD_STAFF     POST /api/auth/login
- 6. Browse available         GET  /api/vehicles/available
- 7. Submit trip request      POST /api/trip-requests
- 8. Login as FLEET_MANAGER   POST /api/auth/login
- 9. Approve trip             PATCH /api/trip-requests/{id}/approve
-10. Login as FIELD_STAFF     POST /api/auth/login
-11. Submit mileage log       POST /api/mileage-logs
-    └─ if milestone crossed → maintenance flag auto-created via Kafka
-12. Login as FLEET_MANAGER   POST /api/auth/login
-13. Complete trip            PATCH /api/trip-requests/{id}/complete
-14. Assign maintenance flag  PATCH /api/maintenance-flags/{id}/assign
-15. Login as MAINTENANCE     POST /api/auth/login
-16. Update progress          PATCH /api/maintenance-flags/{id}/progress
-17. Resolve flag             PATCH /api/maintenance-flags/{id}/resolve
-    └─ vehicle returns to AVAILABLE automatically
+ 1.  Login as ADMIN              POST /api/auth/login
+ 2.  Create users                POST /api/admin/users          (one per role)
+     └─ reset any password       PATCH /api/admin/users/{id}/reset-password
+ 3a. (Optional) Change own pwd  PATCH /api/auth/change-password
+ 3.  Login as FLEET_MANAGER      POST /api/auth/login
+ 4.  Register vehicles           POST /api/vehicles
+ 5.  Login as FIELD_STAFF        POST /api/auth/login
+ 6.  Browse available vehicles   GET  /api/vehicles/available
+ 7.  Submit trip request         POST /api/trip-requests
+ 8.  Login as FLEET_MANAGER      POST /api/auth/login
+ 9.  Approve trip                PATCH /api/trip-requests/{id}/approve
+10.  Login as FIELD_STAFF        POST /api/auth/login
+11.  Submit mileage log          POST /api/mileage-logs          (odometer reading)
+     └─ if milestone crossed → vehicle → MAINTENANCE, fleet manager notified via Kafka
+12.  Login as FLEET_MANAGER      POST /api/auth/login
+13.  Complete trip               PATCH /api/trip-requests/{id}/complete
+14.  Assign maintenance flag     PATCH /api/maintenance-flags/{id}/assign
+15.  Login as MAINTENANCE_TEAM   POST /api/auth/login
+16.  Update progress             PATCH /api/maintenance-flags/{id}/progress
+17.  Mark work done              PATCH /api/maintenance-flags/{id}/done
+     └─ fleet manager notified by email to approve
+18.  Login as FLEET_MANAGER      POST /api/auth/login
+19.  Approve maintenance         PATCH /api/maintenance-flags/{id}/approve
+     └─ service history recorded, vehicle returns to AVAILABLE
 ```

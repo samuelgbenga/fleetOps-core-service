@@ -58,3 +58,67 @@ outbox events. that keeps event in situation where kafka fail so they are republ
 
 
 the log/monitoring. using AOP
+
+we can look at beautifying the app:
+
+I want to believe this system works as such:
+there is a configurable mileage for each vehicle. which can be set by the
+fleet_manager, or admin. and can be set during the creation time.
+but there is a default incase it is not set. (please move that default value to application
+properties and set it to 3000,
+
+after a field staff has been handed the vehicle for every completed trip.
+the field staff is meant to submit a mileage report of that vehicle.
+
+that mileage report/update will then be tracked by the system (note it is expected that  - a background  operate:
+when the field staff drops the mileage after each trip they get an instance reponse like a
+a default thank you or update/report successfull submited but the process of flaging maintainnance and
+notifying fleetmanager is a background process)
+
+so the mileage update is the report from vehicle odometer.
+so the report that would begiven is not a pertrip mileage so you dont have to add new
+mileage to an old.
+since it is the lifetime mileage. the milleage is just updated directly - because
+it is a report from the vehicle odometer.
+
+so once the mileage gets to the configurable mileage of the vehicle set by the
+fleetmanager or admin. a maintance should be flaged for that particular vehcile.
+this should block the vehicle from being able to be requested.
+
+also for a vehichle to be marked as completed from maintance (i.e not under maintance)
+it will need an approval fromn the fleetmanager and the approval requires that
+the fleet manager set a new mileage for that particular vehicle. that is greater that
+the previous configurable mileage value.
+
+a vehicle history should be its own table.
+so ther should be a one to many relationship from vehicle to its Servicehistory.
+it should contain the FullName of the FleetManger who wrote it.
+
+so during the approval the manager is required give a service history of the vehicle.
+
+so remove serviceHistory  field from the Vechile. it should be an entity itself.
+also i should be able to fetch the vehicle history from the vehicle the other way round is not
+allowed to prevent this infinit loop nonense.
+
+do you understand everything that as been said.
+
+Also: confirm for me: those the fleet  manage have the ability to create a ticket
+for maintance and attach this to the maintainance team that the main.
+
+does the maintainance have the ability to toggle the status/flag to in_progress and
+completed?
+
+
+ 2. Can the maintenance team toggle to IN_PROGRESS and COMPLETED?
+  - IN_PROGRESS — yes, via updateProgress().
+  - COMPLETED/RESOLVED — currently yes, but this needs to change. Based on what you described, marking a vehicle as out-of-maintenance requires
+  fleet manager approval (they must provide the new milestone interval + service history). So maintenance team should only go up to IN_PROGRESS.
+  The fleet manager closes it.
+
+there should be a way the maintance team alert the  fleetManager that they are done.
+so there should be a state before completed. this state the fleetManger should get a message
+
+an email notification that the task has been completed.
+there should be that state to.
+and also has the
+

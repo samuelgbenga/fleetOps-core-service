@@ -3,6 +3,7 @@ package com.fleetops.core.user.service;
 import com.fleetops.core.exception.ConflictException;
 import com.fleetops.core.exception.ResourceNotFoundException;
 import com.fleetops.core.user.dto.CreateUserRequest;
+import com.fleetops.core.user.dto.ResetPasswordRequest;
 import com.fleetops.core.user.dto.UserResponse;
 import com.fleetops.core.user.entity.User;
 import com.fleetops.core.user.enums.UserRole;
@@ -125,6 +126,57 @@ class UserServiceTest {
         assertThatThrownBy(() -> userService.getUserById(99L))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("99");
+    }
+
+    // ── resetPassword ────────────────────────────────────────────────────────
+
+    @Test
+    void resetPassword_success_encodesAndOverwritesPassword() {
+        User existing = user(1L, "Alice", UserRole.FIELD_STAFF);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(passwordEncoder.encode("HardSet@99")).thenReturn("hashed_new");
+        when(userRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        ResetPasswordRequest req = new ResetPasswordRequest();
+        req.setNewPassword("HardSet@99");
+
+        userService.resetPassword(1L, req);
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(captor.capture());
+        assertThat(captor.getValue().getPassword()).isEqualTo("hashed_new");
+    }
+
+    @Test
+    void resetPassword_userNotFound_throwsResourceNotFound() {
+        when(userRepository.findById(99L)).thenReturn(Optional.empty());
+
+        ResetPasswordRequest req = new ResetPasswordRequest();
+        req.setNewPassword("AnyPass@1");
+
+        assertThatThrownBy(() -> userService.resetPassword(99L, req))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("99");
+        verify(userRepository, never()).save(any());
+        verify(passwordEncoder, never()).encode(any());
+    }
+
+    @Test
+    void resetPassword_doesNotRequireCurrentPassword() {
+        // Admin reset bypasses old-password verification entirely
+        User existing = user(2L, "Bob", UserRole.FLEET_MANAGER);
+        when(userRepository.findById(2L)).thenReturn(Optional.of(existing));
+        when(passwordEncoder.encode(any())).thenReturn("hashed");
+        when(userRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        ResetPasswordRequest req = new ResetPasswordRequest();
+        req.setNewPassword("ResetMe@1");
+
+        userService.resetPassword(2L, req);
+
+        verify(userRepository).save(any());
+        // No call to passwordEncoder.matches — old password is never checked
+        verify(passwordEncoder, never()).matches(any(), any());
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────

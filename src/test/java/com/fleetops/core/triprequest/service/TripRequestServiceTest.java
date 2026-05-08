@@ -65,6 +65,8 @@ class TripRequestServiceTest {
 
         when(userRepository.findByEmail("staff@fleetops.com")).thenReturn(Optional.of(staff));
         when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+        when(tripRequestRepository.existsByFieldStaffIdAndVehicleIdAndStatus(1L, 10L, TripRequestStatus.PENDING))
+                .thenReturn(false);
         when(vehicleAssignmentRepository.existsOverlappingAssignment(any(), any(), any())).thenReturn(false);
         when(tripRequestRepository.save(any())).thenReturn(saved);
 
@@ -119,10 +121,26 @@ class TripRequestServiceTest {
         mockSecurityContext("staff@fleetops.com");
         when(userRepository.findByEmail("staff@fleetops.com")).thenReturn(Optional.of(fieldStaff(1L, "staff@fleetops.com")));
         when(vehicleRepository.findById(10L)).thenReturn(Optional.of(availableVehicle(10L)));
+        when(tripRequestRepository.existsByFieldStaffIdAndVehicleIdAndStatus(1L, 10L, TripRequestStatus.PENDING))
+                .thenReturn(false);
         when(vehicleAssignmentRepository.existsOverlappingAssignment(any(), any(), any())).thenReturn(true);
 
         assertThatThrownBy(() -> tripRequestService.createRequest(createDto(10L)))
                 .isInstanceOf(ConflictException.class);
+    }
+
+    @Test
+    void createRequest_duplicatePendingForSameVehicle_throwsConflict() {
+        mockSecurityContext("staff@fleetops.com");
+        when(userRepository.findByEmail("staff@fleetops.com")).thenReturn(Optional.of(fieldStaff(1L, "staff@fleetops.com")));
+        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(availableVehicle(10L)));
+        when(tripRequestRepository.existsByFieldStaffIdAndVehicleIdAndStatus(1L, 10L, TripRequestStatus.PENDING))
+                .thenReturn(true);
+
+        assertThatThrownBy(() -> tripRequestService.createRequest(createDto(10L)))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("pending request");
+        verify(tripRequestRepository, never()).save(any());
     }
 
     // ── approveRequest ───────────────────────────────────────────────────────

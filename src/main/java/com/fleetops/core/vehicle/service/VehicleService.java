@@ -3,14 +3,17 @@ package com.fleetops.core.vehicle.service;
 import com.fleetops.core.exception.ConflictException;
 import com.fleetops.core.exception.ResourceNotFoundException;
 import com.fleetops.core.vehicle.dto.MilestoneIntervalRequest;
-import com.fleetops.core.vehicle.dto.ServiceHistoryRequest;
+import com.fleetops.core.vehicle.dto.ServiceHistoryResponse;
 import com.fleetops.core.vehicle.dto.VehicleRequest;
 import com.fleetops.core.vehicle.dto.VehicleResponse;
 import com.fleetops.core.vehicle.entity.Vehicle;
 import com.fleetops.core.vehicle.enums.VehicleStatus;
+import com.fleetops.core.vehicle.repository.ServiceHistoryRepository;
 import com.fleetops.core.vehicle.repository.VehicleRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -19,6 +22,10 @@ import java.util.List;
 public class VehicleService {
 
     private final VehicleRepository vehicleRepository;
+    private final ServiceHistoryRepository serviceHistoryRepository;
+
+    @Value("${app.vehicle.default-milestone-interval}")
+    private Double defaultMilestoneInterval;
 
     public VehicleResponse registerVehicle(VehicleRequest request) {
         if (vehicleRepository.existsByPlateNumber(request.getPlateNumber())) {
@@ -29,7 +36,7 @@ public class VehicleService {
                 .model(request.getModel())
                 .plateNumber(request.getPlateNumber())
                 .milestoneInterval(request.getMilestoneInterval() != null
-                        ? request.getMilestoneInterval() : 5000.0)
+                        ? request.getMilestoneInterval() : defaultMilestoneInterval)
                 .build();
         return VehicleResponse.from(vehicleRepository.save(vehicle));
     }
@@ -43,19 +50,17 @@ public class VehicleService {
                 .stream().map(VehicleResponse::from).toList();
     }
 
+    @Transactional(readOnly = true)
     public VehicleResponse getVehicleById(Long id) {
-        return vehicleRepository.findById(id)
-                .map(VehicleResponse::from)
-                .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + id));
-    }
-
-    public VehicleResponse updateServiceHistory(Long id, ServiceHistoryRequest request) {
         Vehicle vehicle = vehicleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + id));
-        vehicle.setServiceHistory(request.getServiceHistory());
-        return VehicleResponse.from(vehicleRepository.save(vehicle));
+        List<ServiceHistoryResponse> histories = serviceHistoryRepository
+                .findByVehicleIdOrderByServicedAtDesc(id)
+                .stream().map(ServiceHistoryResponse::from).toList();
+        return VehicleResponse.from(vehicle, histories);
     }
 
+    @Transactional
     public VehicleResponse updateMilestoneInterval(Long id, MilestoneIntervalRequest request) {
         Vehicle vehicle = vehicleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + id));

@@ -50,6 +50,9 @@ public class MaintenanceFlag {
     @Column(name = "assigned_at")
     private LocalDateTime assignedAt;
 
+    @Column(name = "pending_approval_at")
+    private LocalDateTime pendingApprovalAt;
+
     @Column(name = "resolved_at")
     private LocalDateTime resolvedAt;
 
