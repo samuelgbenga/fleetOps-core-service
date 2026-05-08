@@ -52,15 +52,9 @@ admin should also be able to approve oh.
 
 
 Auto-trigger by  by mileage covererd.
+
+outbox events. that keeps event in situation where kafka fail so they are republished
+
+
+
 the log/monitoring. using AOP
-
-
-admin:
-eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiUk9MRV9BRE1JTiIsInN1YiI6ImFkbWluQGZsZWV0b3BzLmNvbSIsImlhdCI6MTc3ODE3MDg3OSwiZXhwIjoxNzc4MjU3Mjc5fQ.B4WUfUUhOTi0-K-MVpTJ1Vu2JJcxporexzPpouVT_c8
-
-field_staff:
-eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiUk9MRV9GSUVMRF9TVEFGRiIsInN1YiI6InNhbXVlbGdiZW5nYXNuckBnbWFpbC5jb20iLCJpYXQiOjE3NzgxNzE1MjIsImV4cCI6MTc3ODI1NzkyMn0.UVpMh7DUIzZMHMXfyU-haAo9Tw0x-SbApG3v-_I0TN8
-
-fleet_manager:
-eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiUk9MRV9GTEVFVF9NQU5BR0VSIiwic3ViIjoic2FtdWVsZ2JlbmdhOTcyQGdtYWlsLmNvbSIsImlhdCI6MTc3ODE3MTg2NywiZXhwIjoxNzc4MjU4MjY3fQ.Z5vkmYHOmfxyc3RBdSY3dByXIlUKhkimc9vhtjVmS6k
-

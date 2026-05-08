@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 
 @Component
-@Profile("!dev")
+//@Profile("!dev")
 @RequiredArgsConstructor
 @Slf4j
 public class MaintenanceFlagConsumer {

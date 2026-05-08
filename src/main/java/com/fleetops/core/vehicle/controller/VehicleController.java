@@ -46,7 +46,7 @@ public class VehicleController {
     }
 
     @PatchMapping("/{id}/service-history")
-    @PreAuthorize("hasRole('FLEET_MANAGER')")
+    @PreAuthorize("hasRole('FLEET_MANAGER', 'ADMIN')")
     public ResponseEntity<VehicleResponse> updateServiceHistory(
             @PathVariable Long id,
             @Valid @RequestBody ServiceHistoryRequest request) {
@@ -54,7 +54,7 @@ public class VehicleController {
     }
 
     @PatchMapping("/{id}/milestone-interval")
-    @PreAuthorize("hasRole('FLEET_MANAGER')")
+    @PreAuthorize("hasRole('FLEET_MANAGER', 'ADMIN')")
     public ResponseEntity<VehicleResponse> updateMilestoneInterval(
             @PathVariable Long id,
             @Valid @RequestBody MilestoneIntervalRequest request) {

@@ -26,7 +26,7 @@ public class TripRequestController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('FLEET_MANAGER')")
+    @PreAuthorize("hasAnyRole('FLEET_MANAGER', 'ADMIN')")
     public ResponseEntity<List<TripRequestResponse>> getPending() {
         return ResponseEntity.ok(tripRequestService.getPendingRequests());
     }
@@ -44,19 +44,19 @@ public class TripRequestController {
     }
 
     @PatchMapping("/{id}/approve")
-    @PreAuthorize("hasRole('FLEET_MANAGER')")
+    @PreAuthorize("hasAnyRole('FLEET_MANAGER', 'ADMIN')")
     public ResponseEntity<TripRequestResponse> approve(@PathVariable Long id) {
         return ResponseEntity.ok(tripRequestService.approveRequest(id));
     }
 
     @PatchMapping("/{id}/reject")
-    @PreAuthorize("hasRole('FLEET_MANAGER')")
+    @PreAuthorize("hasAnyRole('FLEET_MANAGER', 'ADMIN')")
     public ResponseEntity<TripRequestResponse> reject(@PathVariable Long id) {
         return ResponseEntity.ok(tripRequestService.rejectRequest(id));
     }
 
     @PatchMapping("/{id}/complete")
-    @PreAuthorize("hasRole('FLEET_MANAGER')")
+    @PreAuthorize("hasAnyRole('FLEET_MANAGER', 'ADMIN')")
     public ResponseEntity<TripRequestResponse> complete(@PathVariable Long id) {
         return ResponseEntity.ok(tripRequestService.completeTrip(id));
     }
