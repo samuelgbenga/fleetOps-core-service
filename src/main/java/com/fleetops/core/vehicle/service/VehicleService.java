@@ -2,6 +2,8 @@ package com.fleetops.core.vehicle.service;
 
 import com.fleetops.core.exception.ConflictException;
 import com.fleetops.core.exception.ResourceNotFoundException;
+import com.fleetops.core.vehicle.dto.MilestoneIntervalRequest;
+import com.fleetops.core.vehicle.dto.ServiceHistoryRequest;
 import com.fleetops.core.vehicle.dto.VehicleRequest;
 import com.fleetops.core.vehicle.dto.VehicleResponse;
 import com.fleetops.core.vehicle.entity.Vehicle;
@@ -45,5 +47,19 @@ public class VehicleService {
         return vehicleRepository.findById(id)
                 .map(VehicleResponse::from)
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + id));
+    }
+
+    public VehicleResponse updateServiceHistory(Long id, ServiceHistoryRequest request) {
+        Vehicle vehicle = vehicleRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + id));
+        vehicle.setServiceHistory(request.getServiceHistory());
+        return VehicleResponse.from(vehicleRepository.save(vehicle));
+    }
+
+    public VehicleResponse updateMilestoneInterval(Long id, MilestoneIntervalRequest request) {
+        Vehicle vehicle = vehicleRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + id));
+        vehicle.setMilestoneInterval(request.getMilestoneInterval());
+        return VehicleResponse.from(vehicleRepository.save(vehicle));
     }
 }

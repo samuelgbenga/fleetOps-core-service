@@ -1,5 +1,7 @@
 package com.fleetops.core.vehicle.controller;
 
+import com.fleetops.core.vehicle.dto.MilestoneIntervalRequest;
+import com.fleetops.core.vehicle.dto.ServiceHistoryRequest;
 import com.fleetops.core.vehicle.dto.VehicleRequest;
 import com.fleetops.core.vehicle.dto.VehicleResponse;
 import com.fleetops.core.vehicle.service.VehicleService;
@@ -20,7 +22,7 @@ public class VehicleController {
     private final VehicleService vehicleService;
 
     @PostMapping
-    @PreAuthorize("hasRole('FLEET_MANAGER')")
+    @PreAuthorize("hasAnyRole('FLEET_MANAGER', 'ADMIN')")
     public ResponseEntity<VehicleResponse> register(@Valid @RequestBody VehicleRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(vehicleService.registerVehicle(request));
     }
@@ -41,5 +43,21 @@ public class VehicleController {
     @PreAuthorize("hasAnyRole('FLEET_MANAGER', 'ADMIN')")
     public ResponseEntity<VehicleResponse> getById(@PathVariable Long id) {
         return ResponseEntity.ok(vehicleService.getVehicleById(id));
+    }
+
+    @PatchMapping("/{id}/service-history")
+    @PreAuthorize("hasRole('FLEET_MANAGER')")
+    public ResponseEntity<VehicleResponse> updateServiceHistory(
+            @PathVariable Long id,
+            @Valid @RequestBody ServiceHistoryRequest request) {
+        return ResponseEntity.ok(vehicleService.updateServiceHistory(id, request));
+    }
+
+    @PatchMapping("/{id}/milestone-interval")
+    @PreAuthorize("hasRole('FLEET_MANAGER')")
+    public ResponseEntity<VehicleResponse> updateMilestoneInterval(
+            @PathVariable Long id,
+            @Valid @RequestBody MilestoneIntervalRequest request) {
+        return ResponseEntity.ok(vehicleService.updateMilestoneInterval(id, request));
     }
 }

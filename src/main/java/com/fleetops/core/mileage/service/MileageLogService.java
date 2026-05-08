@@ -43,29 +43,33 @@ public class MileageLogService {
         Double oldMileage = vehicle.getCurrentMileage();
         Double newMileage = oldMileage + request.getMileageAdded();
 
-        // Update vehicle mileage
         vehicle.setCurrentMileage(newMileage);
         vehicleRepository.save(vehicle);
 
-        // Save mileage log
-        MileageLog log = MileageLog.builder()
+        MileageLog mileageLog = MileageLog.builder()
                 .vehicle(vehicle)
                 .submittedBy(submittedBy)
                 .mileageAdded(request.getMileageAdded())
+                .mileageAfter(newMileage)
                 .build();
-        mileageLogRepository.save(log);
+        mileageLogRepository.save(mileageLog);
 
-        // Check if milestone has been crossed
         if (vehicle.isMilestoneReached(oldMileage)) {
             log.info("Milestone reached for vehicle {}. Publishing event.", vehicle.getPlateNumber());
             publishMaintenanceEvent(vehicle, newMileage);
         }
 
-        return MileageLogResponse.from(log, newMileage);
+        return MileageLogResponse.from(mileageLog);
+    }
+
+    public List<MileageLogResponse> getLogsByVehicle(Long vehicleId) {
+        vehicleRepository.findById(vehicleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + vehicleId));
+        return mileageLogRepository.findByVehicleIdOrderByLoggedAtDesc(vehicleId)
+                .stream().map(MileageLogResponse::from).toList();
     }
 
     private void publishMaintenanceEvent(Vehicle vehicle, Double mileageAtTrigger) {
-        // Find a fleet manager to notify (pick the first one found)
         List<User> managers = userRepository.findByRole(UserRole.FLEET_MANAGER);
         if (managers.isEmpty()) {
             log.warn("No FLEET_MANAGER found to notify for vehicle {}", vehicle.getPlateNumber());

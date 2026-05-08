@@ -10,12 +10,14 @@ import com.fleetops.core.vehicle.enums.VehicleStatus;
 import com.fleetops.core.vehicle.repository.VehicleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 
 @Component
+@Profile("!dev")
 @RequiredArgsConstructor
 @Slf4j
 public class MaintenanceFlagConsumer {

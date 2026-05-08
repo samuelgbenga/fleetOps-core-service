@@ -31,6 +31,12 @@ public class TripRequestController {
         return ResponseEntity.ok(tripRequestService.getPendingRequests());
     }
 
+    @GetMapping("/all")
+    @PreAuthorize("hasAnyRole('FLEET_MANAGER', 'ADMIN')")
+    public ResponseEntity<List<TripRequestResponse>> getAll() {
+        return ResponseEntity.ok(tripRequestService.getAllRequests());
+    }
+
     @GetMapping("/my")
     @PreAuthorize("hasRole('FIELD_STAFF')")
     public ResponseEntity<List<TripRequestResponse>> getMine() {
@@ -47,5 +53,11 @@ public class TripRequestController {
     @PreAuthorize("hasRole('FLEET_MANAGER')")
     public ResponseEntity<TripRequestResponse> reject(@PathVariable Long id) {
         return ResponseEntity.ok(tripRequestService.rejectRequest(id));
+    }
+
+    @PatchMapping("/{id}/complete")
+    @PreAuthorize("hasRole('FLEET_MANAGER')")
+    public ResponseEntity<TripRequestResponse> complete(@PathVariable Long id) {
+        return ResponseEntity.ok(tripRequestService.completeTrip(id));
     }
 }

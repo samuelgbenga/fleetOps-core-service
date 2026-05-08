@@ -31,6 +31,9 @@ public class MileageLog {
     @Column(name = "mileage_added", nullable = false)
     private Double mileageAdded;
 
+    @Column(name = "mileage_after", nullable = false)
+    private Double mileageAfter;
+
     @Column(name = "logged_at", nullable = false, updatable = false)
     private LocalDateTime loggedAt;
 

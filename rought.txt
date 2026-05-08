@@ -1,0 +1,66 @@
+
+this should not be the respons for wrong credentials pls.
+login should through 401 wrong password or email?
+{
+  "status": 500,
+  "error": "Internal Server Error",
+  "message": "An unexpected error occurred",
+  "timestamp": "2026-05-07T12:52:36.4867336"
+}
+
+admin should also be able to insert vehicle:
+{
+  "status": 403,
+  "error": "Forbidden",
+  "message": "Access denied",
+  "timestamp": "2026-05-07T12:59:14.0597317"
+}
+
+//
+how is mutliple pending request for thesame car handled.
+how is approval determined.
+how are the dead pending request handled after one approval?
+
+same field staff should not be able to make
+same request for thesame vehicle multiple times.
+
+write a chrone job
+
+so this ist when a car is approve. whatever pending request of that same car
+that exist, compare the end date of the approved and the end the start date of the
+pending. if the enddate is after the start date of the pending. convert there request to
+
+
+error on role not assigned is not good should not be five hundred:
+{
+  "status": 500,
+  "error": "Internal Server Error",
+  "message": "An unexpected error occurred",
+  "timestamp": "2026-05-07T16:43:57.9231733"
+}
+{
+  "name": "Samuel Gbenga",
+  "email": "samuelgbenga972@gmail.com",
+  "password": "Staff@1234",
+  "role": "_STAFF"
+}
+
+thesame field manager should not be able to make same request to a particular car.
+this should not be allowed.
+
+admin should also be able to approve oh.
+
+
+Auto-trigger by  by mileage covererd.
+the log/monitoring. using AOP
+
+
+admin:
+eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiUk9MRV9BRE1JTiIsInN1YiI6ImFkbWluQGZsZWV0b3BzLmNvbSIsImlhdCI6MTc3ODE3MDg3OSwiZXhwIjoxNzc4MjU3Mjc5fQ.B4WUfUUhOTi0-K-MVpTJ1Vu2JJcxporexzPpouVT_c8
+
+field_staff:
+eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiUk9MRV9GSUVMRF9TVEFGRiIsInN1YiI6InNhbXVlbGdiZW5nYXNuckBnbWFpbC5jb20iLCJpYXQiOjE3NzgxNzE1MjIsImV4cCI6MTc3ODI1NzkyMn0.UVpMh7DUIzZMHMXfyU-haAo9Tw0x-SbApG3v-_I0TN8
+
+fleet_manager:
+eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiUk9MRV9GTEVFVF9NQU5BR0VSIiwic3ViIjoic2FtdWVsZ2JlbmdhOTcyQGdtYWlsLmNvbSIsImlhdCI6MTc3ODE3MTg2NywiZXhwIjoxNzc4MjU4MjY3fQ.Z5vkmYHOmfxyc3RBdSY3dByXIlUKhkimc9vhtjVmS6k
+

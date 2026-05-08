@@ -5,6 +5,8 @@ import com.fleetops.core.assignment.repository.VehicleAssignmentRepository;
 import com.fleetops.core.exception.ConflictException;
 import com.fleetops.core.exception.ResourceNotFoundException;
 import com.fleetops.core.exception.VehicleNotAvailableException;
+import com.fleetops.core.kafka.event.NotificationRequestEvent;
+import com.fleetops.core.kafka.producer.NotificationEventProducer;
 import com.fleetops.core.triprequest.dto.TripRequestCreate;
 import com.fleetops.core.triprequest.dto.TripRequestResponse;
 import com.fleetops.core.triprequest.entity.TripRequest;
@@ -20,6 +22,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -30,26 +33,32 @@ public class TripRequestService {
     private final VehicleRepository vehicleRepository;
     private final VehicleAssignmentRepository vehicleAssignmentRepository;
     private final UserRepository userRepository;
+    private final NotificationEventProducer notificationEventProducer;
 
     @Transactional
     public TripRequestResponse createRequest(TripRequestCreate dto) {
-        // Get currently authenticated field staff
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         User fieldStaff = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        // Step 1: Check vehicle exists
         Vehicle vehicle = vehicleRepository.findById(dto.getVehicleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + dto.getVehicleId()));
 
-        // Step 2: Check vehicle is AVAILABLE
         if (!vehicle.isAvailable()) {
             throw new VehicleNotAvailableException(
                     "Vehicle " + vehicle.getPlateNumber() + " is currently " + vehicle.getStatus()
             );
         }
 
-        // Step 3: Check no date overlap
+        boolean alreadyRequested = tripRequestRepository.existsByFieldStaffIdAndVehicleIdAndStatus(
+                fieldStaff.getId(), vehicle.getId(), TripRequestStatus.PENDING
+        );
+        if (alreadyRequested) {
+            throw new ConflictException(
+                    "You already have a pending request for vehicle " + vehicle.getPlateNumber()
+            );
+        }
+
         boolean hasConflict = vehicleAssignmentRepository.existsOverlappingAssignment(
                 vehicle.getId(), dto.getStartDate(), dto.getEndDate()
         );
@@ -78,7 +87,6 @@ public class TripRequestService {
             throw new ConflictException("Trip request is not in PENDING status");
         }
 
-        // Create assignment and block vehicle
         request.setStatus(TripRequestStatus.APPROVED);
         tripRequestRepository.save(request);
 
@@ -93,7 +101,46 @@ public class TripRequestService {
         request.getVehicle().setStatus(VehicleStatus.ASSIGNED);
         vehicleRepository.save(request.getVehicle());
 
+        notificationEventProducer.publish(NotificationRequestEvent.builder()
+                .recipientEmail(request.getFieldStaff().getEmail())
+                .recipientName(request.getFieldStaff().getName())
+                .subject("Trip Request Approved")
+                .message("Your trip to " + request.getDestination() + " ("
+                        + request.getStartDate() + " – " + request.getEndDate()
+                        + ") has been approved. Vehicle: " + request.getVehicle().getPlateNumber())
+                .type("TRIP_APPROVED")
+                .occurredAt(LocalDateTime.now())
+                .build());
+
+        rejectConflictingPendingRequests(request);
+
         return TripRequestResponse.from(request);
+    }
+
+    private void rejectConflictingPendingRequests(TripRequest approved) {
+        tripRequestRepository
+                .findByVehicleIdAndStatus(approved.getVehicle().getId(), TripRequestStatus.PENDING)
+                .stream()
+                .filter(pending -> !pending.getId().equals(approved.getId()))
+                .filter(pending -> approved.getEndDate().isAfter(pending.getStartDate()))
+                .forEach(pending -> {
+                    pending.setStatus(TripRequestStatus.REJECTED);
+                    tripRequestRepository.save(pending);
+
+                    notificationEventProducer.publish(NotificationRequestEvent.builder()
+                            .recipientEmail(pending.getFieldStaff().getEmail())
+                            .recipientName(pending.getFieldStaff().getName())
+                            .subject("Trip Request Rejected")
+                            .message("Your trip request to " + pending.getDestination() + " ("
+                                    + pending.getStartDate() + " – " + pending.getEndDate()
+                                    + ") was rejected because vehicle "
+                                    + approved.getVehicle().getPlateNumber()
+                                    + " has been assigned to another trip until "
+                                    + approved.getEndDate() + ".")
+                            .type("TRIP_REJECTED")
+                            .occurredAt(LocalDateTime.now())
+                            .build());
+                });
     }
 
     @Transactional
@@ -105,11 +152,46 @@ public class TripRequestService {
         }
 
         request.setStatus(TripRequestStatus.REJECTED);
-        return TripRequestResponse.from(tripRequestRepository.save(request));
+        tripRequestRepository.save(request);
+
+        notificationEventProducer.publish(NotificationRequestEvent.builder()
+                .recipientEmail(request.getFieldStaff().getEmail())
+                .recipientName(request.getFieldStaff().getName())
+                .subject("Trip Request Rejected")
+                .message("Your trip request to " + request.getDestination() + " ("
+                        + request.getStartDate() + " – " + request.getEndDate()
+                        + ") has been rejected.")
+                .type("TRIP_REJECTED")
+                .occurredAt(LocalDateTime.now())
+                .build());
+
+        return TripRequestResponse.from(request);
+    }
+
+    @Transactional
+    public TripRequestResponse completeTrip(Long id) {
+        TripRequest request = getRequestOrThrow(id);
+
+        if (request.getStatus() != TripRequestStatus.APPROVED) {
+            throw new ConflictException("Only APPROVED trips can be marked as completed");
+        }
+
+        request.setStatus(TripRequestStatus.COMPLETED);
+        tripRequestRepository.save(request);
+
+        request.getVehicle().setStatus(VehicleStatus.AVAILABLE);
+        vehicleRepository.save(request.getVehicle());
+
+        return TripRequestResponse.from(request);
     }
 
     public List<TripRequestResponse> getPendingRequests() {
         return tripRequestRepository.findByStatus(TripRequestStatus.PENDING)
+                .stream().map(TripRequestResponse::from).toList();
+    }
+
+    public List<TripRequestResponse> getAllRequests() {
+        return tripRequestRepository.findAll()
                 .stream().map(TripRequestResponse::from).toList();
     }
 

@@ -1,8 +1,7 @@
 package com.fleetops.core.assignment.service;
 
-import com.fleetops.core.assignment.entity.VehicleAssignment;
+import com.fleetops.core.assignment.dto.AssignmentResponse;
 import com.fleetops.core.assignment.repository.VehicleAssignmentRepository;
-import com.fleetops.core.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -14,7 +13,8 @@ public class VehicleAssignmentService {
 
     private final VehicleAssignmentRepository vehicleAssignmentRepository;
 
-    public List<VehicleAssignment> getAssignmentsByVehicle(Long vehicleId) {
-        return vehicleAssignmentRepository.findByVehicleId(vehicleId);
+    public List<AssignmentResponse> getAssignmentsByVehicle(Long vehicleId) {
+        return vehicleAssignmentRepository.findByVehicleId(vehicleId)
+                .stream().map(AssignmentResponse::from).toList();
     }
 }
