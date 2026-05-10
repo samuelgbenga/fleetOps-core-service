@@ -1,5 +1,6 @@
 package com.fleetops.core.user.entity;
 
+import com.fleetops.core.media.entity.Media;
 import com.fleetops.core.user.enums.UserRole;
 import jakarta.persistence.*;
 import lombok.*;
@@ -37,6 +38,14 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private UserRole role;
 
+    @Builder.Default
+    @Column(nullable = false)
+    private boolean active = true;
+
+    @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true)
+    @JoinColumn(name = "profile_media_id")
+    private Media profileMedia;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -67,5 +76,5 @@ public class User implements UserDetails {
     public boolean isCredentialsNonExpired(){ return true; }
 
     @Override
-    public boolean isEnabled()              { return true; }
+    public boolean isEnabled()              { return active; }
 }

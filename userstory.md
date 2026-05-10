@@ -13,8 +13,12 @@ Generated from product requirements and system design discussions.
 - [Trip Requests](#trip-requests)
 - [Mileage Reporting](#mileage-reporting)
 - [Maintenance Management](#maintenance-management)
+- [Maintenance Chat](#maintenance-chat)
 - [Service History](#service-history)
 - [Notifications](#notifications)
+- [Vehicle Activity Dashboard](#vehicle-activity-dashboard)
+- [Media Management](#media-management)
+- [User Profile](#user-profile)
 - [Observability](#observability)
 - [Reliability](#reliability)
 
@@ -63,6 +67,27 @@ Generated from product requirements and system design discussions.
 
 ---
 
+### US-026 — Deactivate and reactivate a user account
+**As an** Admin,
+**I want to** deactivate or reactivate any user account,
+**So that** I can revoke access without permanently deleting the user's history.
+
+**Acceptance Criteria:**
+- `PATCH /api/admin/users/{id}/deactivate` soft-deletes the account (sets `active = false`)
+  - Returns `404` if the user does not exist
+  - Returns `409 Conflict` if the account is already deactivated
+  - Returns `204 No Content` on success
+- `PATCH /api/admin/users/{id}/reactivate` restores the account (sets `active = true`)
+  - Returns `404` if the user does not exist
+  - Returns `409 Conflict` if the account is already active
+  - Returns `204 No Content` on success
+- A deactivated user attempting to log in receives `401 Unauthorized` with message `"Account is deactivated. Please contact an administrator."`
+- `GET /api/admin/users` returns all users (active and inactive) with an `active` field so the admin can identify and reactivate accounts
+- Only active fleet managers receive email notifications (mileage milestones, new trip requests)
+- Restricted to `ADMIN` only
+
+---
+
 ## Password Management
 
 ### US-004 — Change own password
@@ -105,6 +130,23 @@ Generated from product requirements and system design discussions.
 - If `milestoneInterval` is not provided, defaults to the value in `application.yml` (`3000` km, configurable via `DEFAULT_MILESTONE_INTERVAL` env var)
 - Duplicate plate number returns `409 Conflict`
 - Both `FLEET_MANAGER` and `ADMIN` roles can register vehicles
+- Plate number is validated per US-027 before registration
+
+---
+
+### US-027 — Nigerian plate number validation
+**As a** Fleet Manager or Admin,
+**I want** the system to validate plate numbers against the Nigerian vehicle registration standard,
+**So that** only correctly formatted plates with recognised LGA codes are accepted.
+
+**Acceptance Criteria:**
+- Plate number format: `ABC-123DE` — 3-letter LGA code, hyphen, 3-digit sequence (001–999), 2-letter suffix
+- Input is trimmed and uppercased automatically before validation
+- The 3-letter prefix must exist in the `lga_codes` table (seeded from `nigeria_plate_codes.csv` at startup)
+- Sequence number `000` is rejected; valid range is `001–999`
+- Returns `400 Bad Request` if format is invalid or LGA prefix is unrecognised
+- The normalised (trimmed, uppercased) value is stored in the database
+- LGA codes are seeded once on startup; re-seeding is skipped if the table already has records
 
 ---
 
@@ -134,6 +176,24 @@ Generated from product requirements and system design discussions.
 ---
 
 ## Trip Requests
+
+> **Design Decision — Why vehicle availability is not time-based**
+>
+> A reasonable question is: why does approving a trip request two months in the future
+> immediately set the vehicle to `ASSIGNED` and block all other requests, rather than
+> allowing the vehicle to be assigned to other trips in the intervening period?
+>
+> The decision was deliberate. The system relies on the **fleet manager's judgement** about
+> the health and readiness of each vehicle. When a fleet manager approves a future trip,
+> they are asserting that the vehicle will be fit for that trip — which implicitly means
+> it should not be subjected to additional wear from other trips in the lead-up period.
+> Allowing the vehicle to be assigned to intermediate trips would undermine that health
+> guarantee and could leave the vehicle unfit for the originally approved journey.
+>
+> Time-based slot availability (where a vehicle can be re-assigned in windows between
+> approved trips) is noted as a future enhancement, but it would require the fleet manager
+> to actively reason about cumulative mileage and maintenance windows — a complexity
+> that is out of scope for the current system design.
 
 ### US-009 — Submit a trip request
 **As a** Field Staff member,
@@ -168,15 +228,37 @@ Generated from product requirements and system design discussions.
 
 ---
 
-### US-011 — Complete a trip
-**As a** Fleet Manager or Admin,
-**I want to** mark an approved trip as completed,
-**So that** the vehicle is returned to the available pool.
+### US-011 — Complete a trip (with optional mileage submission)
+**As a** Field Staff member or Fleet Manager,
+**I want to** mark an approved trip as completed — and optionally record the odometer reading at that moment,
+**So that** the vehicle is returned to the available pool and mileage can be captured in a single action.
+
+> **Design Decision — No date gate on trip completion**
+>
+> The system deliberately does **not** enforce that a trip can only be completed on or after its
+> `endDate`. Real-world operations rarely follow a rigid schedule — a field trip may finish early,
+> conditions may change mid-journey, or a fleet manager may need to withdraw a vehicle before the
+> original end date (equipment fault, re-prioritisation, etc.). Blocking completion until the
+> proposed end date would force workarounds and break legitimate workflows.
+>
+> The `endDate` on a trip request exists to signal **intent** and to detect date conflicts during
+> approval — it is not a hard lock on when completion can occur.
 
 **Acceptance Criteria:**
-- `PATCH /api/trip-requests/{id}/complete` — only works on `APPROVED` trips
+- `PATCH /api/trip-requests/{id}/complete` — only works on `APPROVED` trips; returns `409` otherwise
+- Accessible by **`FIELD_STAFF`**, `FLEET_MANAGER`, and `ADMIN`
+  - A field staff member can only complete **their own** trip — returns `403` if they attempt to complete another staff member's trip
+  - Fleet managers and admins can complete **any** approved trip (supports early vehicle withdrawal)
+- No date restriction — the trip may be completed before, on, or after its `endDate`
 - Sets vehicle status back to `AVAILABLE`
-- Returns `409` if the trip is not `APPROVED`
+- Accepts an **optional** request body `{ "reportedMileage": <double> }`
+  - If `reportedMileage` is provided:
+    - Must be **≥** the vehicle's current recorded mileage — returns `409` if lower
+    - Updates the vehicle's `currentMileage` to the reported value
+    - Creates a `MileageLog` entry attributed to the caller
+    - Triggers a maintenance event if the new mileage crosses the configured milestone interval
+  - If omitted (body is absent or `reportedMileage` is null), the trip completes with no mileage update
+- The inline mileage path bypasses the standalone "must have a completed trip" guard because the trip is being completed in the same request
 
 ---
 
@@ -188,7 +270,8 @@ Generated from product requirements and system design discussions.
 **Acceptance Criteria:**
 - `GET /api/trip-requests` — returns `PENDING` requests only (`FLEET_MANAGER`)
 - `GET /api/trip-requests/all` — returns all requests across all statuses (`FLEET_MANAGER`, `ADMIN`)
-- `GET /api/trip-requests/my` — field staff sees only their own requests
+- `GET /api/trip-requests/my` — field staff sees all their own requests across all statuses
+- `GET /api/trip-requests/my/approved` — field staff sees only their currently `APPROVED` trips (the vehicle(s) assigned to them)
 
 ---
 
@@ -207,6 +290,22 @@ Generated from product requirements and system design discussions.
 
 ## Mileage Reporting
 
+> **Design Decision — What mileage tracking is (and is not) for**
+>
+> Mileage reporting in this system has a **single purpose**: determining when a vehicle is due for
+> scheduled maintenance based on kilometres covered. When the vehicle's cumulative odometer reading
+> crosses a configured threshold (`milestoneInterval`), the system automatically raises a maintenance
+> flag and notifies the fleet manager.
+>
+> Mileage is **not** used to:
+> - Detect or flag stolen vehicles
+> - Verify that a vehicle stayed within a trip's intended route or distance
+> - Produce per-trip distance reports
+>
+> The `reportedMileage` value is an **absolute odometer reading** — not a per-trip delta. The system
+> trusts the field staff to report the actual instrument reading. Accuracy is expected by policy, not
+> enforced by GPS or external data sources.
+
 ### US-014 — Submit an odometer reading
 **As a** Field Staff member,
 **I want to** report the vehicle's odometer reading after a completed trip,
@@ -215,6 +314,7 @@ Generated from product requirements and system design discussions.
 **Acceptance Criteria:**
 - `POST /api/mileage-logs` accepts `{ vehicleId, reportedMileage }`
 - `reportedMileage` is the **absolute odometer value** — not a per-trip delta
+- The submitting field staff must have a `COMPLETED` trip for that vehicle — returns `409` otherwise
 - Submitted value must be **≥** the vehicle's currently recorded mileage — returns `409` if lower
 - Vehicle's `currentMileage` is set directly to the reported value
 - Returns an instant `200` response confirming the submission
@@ -345,20 +445,164 @@ Generated from product requirements and system design discussions.
 
 **Notification matrix:**
 
-| Event | Recipient |
-|---|---|
-| Trip request approved | Field staff who submitted |
-| Trip request rejected (manual or auto) | Field staff who submitted |
-| Maintenance flag assigned | Maintenance team member assigned |
-| Maintenance progress update | Fleet manager who assigned the flag |
-| Maintenance work marked done | Fleet manager who assigned the flag |
-| Maintenance approved | Maintenance team member who did the work |
-| Vehicle milestone reached | Fleet manager (first available) |
+| Event | Recipient | Kafka type |
+|---|---|---|
+| Account created | Newly registered user | `ACCOUNT_CREATED` |
+| Trip request submitted | All fleet managers | `TRIP_REQUESTED` |
+| Trip request approved | Field staff who submitted | `TRIP_APPROVED` |
+| Trip request rejected (manual or auto) | Field staff who submitted | `TRIP_REJECTED` |
+| Maintenance flag assigned | Maintenance team member assigned | `FLAG_ASSIGNED` |
+| Maintenance progress update | Fleet manager who assigned the flag | `FLAG_PROGRESS` |
+| Maintenance work marked done | Fleet manager who assigned the flag | `FLAG_PENDING_APPROVAL` |
+| Maintenance approved | Maintenance team member who did the work | `FLAG_RESOLVED` |
+| Vehicle milestone reached | Fleet manager (all fleet managers) | `MAINTENANCE_FLAG_RAISED` |
 
 **Acceptance Criteria:**
 - All notifications are sent **asynchronously** via Kafka (`notification.request` topic)
+- Fleet managers are notified immediately when a new trip request is submitted (`PENDING`)
+- A welcome email is sent to each user upon account creation
 - The field staff member gets an **instant** response on mileage submission; the background event handles the rest
 - Notification delivery does not block or fail the primary API response
+
+---
+
+## Vehicle Activity Dashboard
+
+### US-029 — Admin vehicle activity log (real-time fleet health dashboard)
+**As an** Admin,
+**I want to** see a live feed of every significant fleet event — searchable by vehicle plate number and date,
+**So that** I can monitor the health and usage of every vehicle in real time without needing to check individual records.
+
+**Events captured:**
+
+| Event type | Triggered by | Example log line |
+|---|---|---|
+| `TRIP_REQUESTED` | Field staff submits trip request | `Emeka Obi (FIELD_STAFF) requested vehicle KJA-001AB for destination: Abuja (12 May – 15 May)` |
+| `TRIP_APPROVED` | Fleet manager approves | `Trip request #42 approved for vehicle KJA-001AB — assigned to Emeka Obi` |
+| `TRIP_REJECTED` | Fleet manager rejects (manual or auto) | `Trip request #45 auto-rejected for vehicle KJA-001AB — conflict with approved trip until 15 May` |
+| `MILEAGE_SUBMITTED` | Field staff or fleet manager submits odometer reading | `Emeka Obi (FIELD_STAFF) reported odometer reading of 5,240 km on vehicle KJA-001AB` |
+| `MAINTENANCE_SCHEDULED` | System — milestone threshold crossed | `Vehicle KJA-001AB flagged for maintenance — milestone of 5,000 km reached` |
+| `MAINTENANCE_COMPLETED` | Maintenance team marks work done | `Chidi Nwosu (MAINTENANCE_TEAM) marked maintenance work done on vehicle KJA-001AB` |
+| `MILESTONE_UPDATED` | Fleet manager approves maintenance | `Fleet Manager Tunde Bello approved maintenance and set new milestone interval to 10,000 km for KJA-001AB` |
+
+**Architecture:**
+- Each service publishes a `VehicleActivityEvent` to the Kafka topic `fleet.activity`
+- A `VehicleActivityConsumer` listens to the topic and persists each event to the `vehicle_activity_logs` table
+- All event publishing is fire-and-forget (async via Kafka) — primary API responses are not blocked
+
+**Acceptance Criteria:**
+- `GET /api/admin/activity-logs` — returns all logs, newest first
+- `GET /api/admin/activity-logs?plateNumber=KJA-001AB` — filter by plate number
+- `GET /api/admin/activity-logs?date=2026-05-10` — filter by date (all events on that calendar day)
+- `GET /api/admin/activity-logs?plateNumber=KJA-001AB&date=2026-05-10` — combined filter
+- Each log entry includes: `id`, `vehicleId`, `plateNumber`, `eventType`, `description`, `actorName`, `actorRole`, `occurredAt`
+- Restricted to `ADMIN` only
+- The `vehicle_activity_logs` table is indexed on `plate_number` and `occurred_at` for efficient filtering
+- The frontend refreshes manually to see new entries (no push / automatic polling in this version)
+
+> **Future Enhancement — WebSocket push**
+>
+> The current implementation serves data on demand (REST pull). A future upgrade will add a
+> WebSocket channel so the admin dashboard receives new activity events in real time without
+> any manual refresh.
+
+---
+
+## Maintenance Chat
+
+### US-028 — In-flag conversation between maintenance team and fleet manager
+**As a** Maintenance Team member or Fleet Manager,
+**I want to** exchange messages within a maintenance flag,
+**So that** we can coordinate work in real time without switching to a separate communication tool.
+
+> **Current Implementation — Manual refresh (REST polling)**
+>
+> Messages are stored in the database and served via a plain REST endpoint. The frontend
+> fetches the latest messages whenever the user manually refreshes or navigates back to
+> the flag detail view. There is no automatic push mechanism in this version.
+>
+> **Future Enhancement — WebSocket**
+>
+> A WebSocket channel (Spring `@MessageMapping` / STOMP) will be introduced to push new
+> messages to connected clients instantly, eliminating the need for any manual refresh.
+> The database model and REST endpoints implemented here will remain unchanged; only the
+> delivery layer will be upgraded.
+
+**Acceptance Criteria:**
+- `POST /api/maintenance-flags/{flagId}/messages` — send a message
+  - Accepts `{ "message": "<text>" }`
+  - Sender is resolved from the authenticated user's JWT
+  - Returns `201 Created` with the saved message (id, senderName, senderRole, message, sentAt)
+  - Returns `404` if the maintenance flag does not exist
+  - Returns `409 Conflict` if the flag status is `RESOLVED` (conversation is locked — no new messages)
+- `GET /api/maintenance-flags/{flagId}/messages` — fetch all messages
+  - Returns messages ordered oldest → newest (`sentAt ASC`)
+  - Always returns the full history, including for `RESOLVED` flags (read-only after resolution)
+  - Returns `404` if the maintenance flag does not exist
+- Both endpoints restricted to `MAINTENANCE_TEAM`, `FLEET_MANAGER`, and `ADMIN`
+- No automatic delivery / push — the client fetches on demand
+
+---
+
+## Media Management
+
+> **Design Decision — Media Entity**
+>
+> Rather than storing URLs as plain strings on User and Vehicle, media assets are represented
+> as a proper `Media` entity with two fields: `publicId` (the Cloudinary asset identifier, unique
+> across the system) and `url` (the full CDN delivery URL). This separates media lifecycle from
+> the owning entity and allows clean replacement/deletion via `orphanRemoval = true`.
+>
+> - **User → Media**: `@OneToOne` — one profile picture per user. FK stored on the `users` table.
+> - **Vehicle → Media**: `@OneToMany` via a `vehicle_media` join table — multiple photos per vehicle.
+> - The `Media` entity is **unidirectional** — it holds no reference back to `User` or `Vehicle`.
+
+### US-030 — Self-service user profile
+**As an** authenticated user of any role,
+**I want to** view and update my own profile and manage my own profile picture,
+**So that** I can maintain my account details without going through an administrator.
+
+**Acceptance Criteria:**
+- `GET /api/users/me` — returns the caller's own profile (name, email, role, profileMedia)
+- `PATCH /api/users/me` — updates the caller's name only; email cannot be changed
+  - Accepts `{ "name": "<string>" }` — `@NotBlank` validated
+  - Returns `200` with the updated user response
+- `PATCH /api/users/me/media` — sets or replaces the caller's profile picture
+  - Accepts `{ "publicId": "<cloudinary-id>", "url": "<cdn-url>" }`
+  - Replaces any existing media (old `Media` row is deleted via `orphanRemoval`)
+  - Returns `200` with the saved `MediaResponse`
+- `DELETE /api/users/me/media` — removes the caller's profile picture
+  - Returns `409 Conflict` if no profile media is currently set
+  - Returns `204 No Content` on success
+- All four endpoints are accessible to **any** authenticated user (no `@PreAuthorize` role restriction)
+- Caller is resolved from the JWT in the security context — users can only modify their own profile
+
+---
+
+### US-031 — Admin and fleet manager media management
+**As an** Admin or Fleet Manager,
+**I want to** manage profile pictures for users and vehicle photo galleries,
+**So that** I can maintain accurate visual records for staff and fleet assets.
+
+**Acceptance Criteria:**
+- `PATCH /api/admin/users/{id}/media` — sets or replaces any user's profile picture (`ADMIN` only)
+  - Accepts `{ "publicId", "url" }`; returns `200` with `MediaResponse`
+  - Returns `404` if the user does not exist
+- `DELETE /api/admin/users/{id}/media` — removes any user's profile picture (`ADMIN` only)
+  - Returns `409 Conflict` if no media is set; `204 No Content` on success
+- `POST /api/vehicles/{id}/media` — appends photos to a vehicle (`FLEET_MANAGER`, `ADMIN`)
+  - Accepts an **array** of `{ "publicId", "url" }` objects (one or more)
+  - Appends to existing photos (does not replace); returns `200` with the full updated photo list
+  - Returns `404` if the vehicle does not exist
+- `DELETE /api/vehicles/{id}/media/{mediaId}` — removes a specific photo from a vehicle (`FLEET_MANAGER`, `ADMIN`)
+  - Returns `404` if the media entry is not found on that vehicle
+  - Returns `204 No Content` on success
+
+---
+
+## User Profile
+
+*(See US-030 above — self-service profile endpoints are documented there.)*
 
 ---
 
@@ -432,3 +676,9 @@ Generated from product requirements and system design discussions.
 | US-023 Email notifications via Kafka | ✅ Done |
 | US-024 AOP-based request logging | 🔲 Pending |
 | US-025 Transactional outbox for Kafka events | 🔲 Pending |
+| US-026 Deactivate / reactivate user account | ✅ Done |
+| US-027 Nigerian plate number validation | ✅ Done |
+| US-028 Maintenance flag chat (REST, manual refresh) | ✅ Done |
+| US-029 Vehicle activity log / admin dashboard | ✅ Done |
+| US-030 Self-service profile (view, update name, manage own media) | ✅ Done |
+| US-031 Admin + fleet manager media management (user + vehicle) | ✅ Done |

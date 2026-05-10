@@ -2,7 +2,9 @@ package com.fleetops.core.kafka.consumer;
 
 import com.fleetops.core.kafka.event.MaintenanceFlagCreatedEvent;
 import com.fleetops.core.kafka.event.NotificationRequestEvent;
+import com.fleetops.core.kafka.event.VehicleActivityEvent;
 import com.fleetops.core.kafka.producer.NotificationEventProducer;
+import com.fleetops.core.kafka.producer.VehicleActivityProducer;
 import com.fleetops.core.maintenance.entity.MaintenanceFlag;
 import com.fleetops.core.maintenance.repository.MaintenanceFlagRepository;
 import com.fleetops.core.vehicle.entity.Vehicle;
@@ -25,6 +27,7 @@ public class MaintenanceFlagConsumer {
     private final MaintenanceFlagRepository maintenanceFlagRepository;
     private final VehicleRepository vehicleRepository;
     private final NotificationEventProducer notificationEventProducer;
+    private final VehicleActivityProducer vehicleActivityProducer;
 
     @KafkaListener(
             topics = "${kafka.topics.maintenance-flag-created}",
@@ -46,6 +49,18 @@ public class MaintenanceFlagConsumer {
                     .build();
             maintenanceFlagRepository.save(flag);
             log.info("MaintenanceFlag created for vehicle {}", vehicle.getPlateNumber());
+
+            vehicleActivityProducer.publish(VehicleActivityEvent.builder()
+                    .eventType("MAINTENANCE_SCHEDULED")
+                    .vehicleId(vehicle.getId())
+                    .plateNumber(vehicle.getPlateNumber())
+                    .description(String.format(
+                            "Vehicle %s flagged for maintenance — milestone of %.0f km reached (current odometer: %.0f km)",
+                            vehicle.getPlateNumber(), event.getMileageAtTrigger(), event.getMileageAtTrigger()))
+                    .actorName("System")
+                    .actorRole("SYSTEM")
+                    .occurredAt(java.time.LocalDateTime.now())
+                    .build());
         });
 
         // 3. Notify the fleet manager via notification-service

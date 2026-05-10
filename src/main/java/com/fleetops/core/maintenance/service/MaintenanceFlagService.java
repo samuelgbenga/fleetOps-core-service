@@ -3,7 +3,9 @@ package com.fleetops.core.maintenance.service;
 import com.fleetops.core.exception.ConflictException;
 import com.fleetops.core.exception.ResourceNotFoundException;
 import com.fleetops.core.kafka.event.NotificationRequestEvent;
+import com.fleetops.core.kafka.event.VehicleActivityEvent;
 import com.fleetops.core.kafka.producer.NotificationEventProducer;
+import com.fleetops.core.kafka.producer.VehicleActivityProducer;
 import com.fleetops.core.maintenance.dto.ApproveFlagRequest;
 import com.fleetops.core.maintenance.dto.AssignFlagRequest;
 import com.fleetops.core.maintenance.dto.MaintenanceFlagResponse;
@@ -37,6 +39,7 @@ public class MaintenanceFlagService {
     private final VehicleRepository vehicleRepository;
     private final ServiceHistoryRepository serviceHistoryRepository;
     private final NotificationEventProducer notificationEventProducer;
+    private final VehicleActivityProducer vehicleActivityProducer;
 
     public List<MaintenanceFlagResponse> getAllFlags() {
         return maintenanceFlagRepository.findAll()
@@ -132,6 +135,19 @@ public class MaintenanceFlagService {
         flag.setPendingApprovalAt(LocalDateTime.now());
         maintenanceFlagRepository.save(flag);
 
+        String techName = flag.getAssignedTo() != null ? flag.getAssignedTo().getName() : "Maintenance team";
+        String techRole = flag.getAssignedTo() != null ? flag.getAssignedTo().getRole().name() : "MAINTENANCE_TEAM";
+        vehicleActivityProducer.publish(VehicleActivityEvent.builder()
+                .eventType("MAINTENANCE_COMPLETED")
+                .vehicleId(flag.getVehicle().getId())
+                .plateNumber(flag.getVehicle().getPlateNumber())
+                .description(String.format("%s (%s) marked maintenance work done on vehicle %s — awaiting fleet manager approval",
+                        techName, techRole, flag.getVehicle().getPlateNumber()))
+                .actorName(techName)
+                .actorRole(techRole)
+                .occurredAt(LocalDateTime.now())
+                .build());
+
         if (flag.getAssignedBy() != null) {
             String assigneeName = flag.getAssignedTo() != null ? flag.getAssignedTo().getName() : "Maintenance team";
             publishNotification(
@@ -200,6 +216,18 @@ public class MaintenanceFlagService {
         flag.setStatus(FlagStatus.RESOLVED);
         flag.setResolvedAt(LocalDateTime.now());
         maintenanceFlagRepository.save(flag);
+
+        vehicleActivityProducer.publish(VehicleActivityEvent.builder()
+                .eventType("MILESTONE_UPDATED")
+                .vehicleId(vehicle.getId())
+                .plateNumber(vehicle.getPlateNumber())
+                .description(String.format(
+                        "%s (FLEET_MANAGER) approved maintenance for vehicle %s and set new milestone interval to %.0f km",
+                        manager.getName(), vehicle.getPlateNumber(), request.getNewMilestoneInterval()))
+                .actorName(manager.getName())
+                .actorRole("FLEET_MANAGER")
+                .occurredAt(LocalDateTime.now())
+                .build());
 
         // Notify maintenance team member that approval went through
         if (flag.getAssignedTo() != null) {

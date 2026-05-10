@@ -1,10 +1,13 @@
 package com.fleetops.core.vehicle.entity;
 
+import com.fleetops.core.media.entity.Media;
 import com.fleetops.core.vehicle.enums.VehicleStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "vehicles")
@@ -40,6 +43,15 @@ public class Vehicle {
     @Column(nullable = false)
     @Builder.Default
     private VehicleStatus status = VehicleStatus.AVAILABLE;
+
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @JoinTable(
+            name = "vehicle_media",
+            joinColumns = @JoinColumn(name = "vehicle_id"),
+            inverseJoinColumns = @JoinColumn(name = "media_id", unique = true)
+    )
+    @Builder.Default
+    private List<Media> mediaFiles = new ArrayList<>();
 
     @Column(name = "registered_at", nullable = false, updatable = false)
     private LocalDateTime registeredAt;

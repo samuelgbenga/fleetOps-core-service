@@ -28,13 +28,14 @@ public class VehicleService {
     private Double defaultMilestoneInterval;
 
     public VehicleResponse registerVehicle(VehicleRequest request) {
-        if (vehicleRepository.existsByPlateNumber(request.getPlateNumber())) {
-            throw new ConflictException("Plate number already registered: " + request.getPlateNumber());
+        String plateNumber = request.getPlateNumber().trim().toUpperCase();
+        if (vehicleRepository.existsByPlateNumber(plateNumber)) {
+            throw new ConflictException("Plate number already registered: " + plateNumber);
         }
         Vehicle vehicle = Vehicle.builder()
                 .make(request.getMake())
                 .model(request.getModel())
-                .plateNumber(request.getPlateNumber())
+                .plateNumber(plateNumber)
                 .milestoneInterval(request.getMilestoneInterval() != null
                         ? request.getMilestoneInterval() : defaultMilestoneInterval)
                 .build();

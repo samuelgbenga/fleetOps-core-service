@@ -1,5 +1,6 @@
 package com.fleetops.core.triprequest.controller;
 
+import com.fleetops.core.triprequest.dto.CompleteTripRequest;
 import com.fleetops.core.triprequest.dto.TripRequestCreate;
 import com.fleetops.core.triprequest.dto.TripRequestResponse;
 import com.fleetops.core.triprequest.service.TripRequestService;
@@ -43,6 +44,12 @@ public class TripRequestController {
         return ResponseEntity.ok(tripRequestService.getMyRequests());
     }
 
+    @GetMapping("/my/approved")
+    @PreAuthorize("hasRole('FIELD_STAFF')")
+    public ResponseEntity<List<TripRequestResponse>> getMyApproved() {
+        return ResponseEntity.ok(tripRequestService.getMyApprovedRequests());
+    }
+
     @PatchMapping("/{id}/approve")
     @PreAuthorize("hasAnyRole('FLEET_MANAGER', 'ADMIN')")
     public ResponseEntity<TripRequestResponse> approve(@PathVariable Long id) {
@@ -56,8 +63,10 @@ public class TripRequestController {
     }
 
     @PatchMapping("/{id}/complete")
-    @PreAuthorize("hasAnyRole('FLEET_MANAGER', 'ADMIN')")
-    public ResponseEntity<TripRequestResponse> complete(@PathVariable Long id) {
-        return ResponseEntity.ok(tripRequestService.completeTrip(id));
+    @PreAuthorize("hasAnyRole('FIELD_STAFF', 'FLEET_MANAGER', 'ADMIN')")
+    public ResponseEntity<TripRequestResponse> complete(
+            @PathVariable Long id,
+            @RequestBody(required = false) CompleteTripRequest body) {
+        return ResponseEntity.ok(tripRequestService.completeTrip(id, body));
     }
 }

@@ -102,13 +102,51 @@ class VehicleServiceTest {
     @Test
     void registerVehicle_duplicatePlate_throwsConflict() {
         VehicleRequest req = new VehicleRequest();
-        req.setPlateNumber("DUP-001");
-        when(vehicleRepository.existsByPlateNumber("DUP-001")).thenReturn(true);
+        req.setPlateNumber("KJA-001BX");
+        when(vehicleRepository.existsByPlateNumber("KJA-001BX")).thenReturn(true);
 
         assertThatThrownBy(() -> vehicleService.registerVehicle(req))
                 .isInstanceOf(ConflictException.class)
-                .hasMessageContaining("DUP-001");
+                .hasMessageContaining("KJA-001BX");
         verify(vehicleRepository, never()).save(any());
+    }
+
+    @Test
+    void registerVehicle_lowercasePlate_isNormalizedToUppercase() {
+        VehicleRequest req = new VehicleRequest();
+        req.setMake("Toyota");
+        req.setModel("Camry");
+        req.setPlateNumber("kja-245bx");
+        req.setMilestoneInterval(3000.0);
+
+        Vehicle saved = vehicle(1L, "Toyota", "Camry", "KJA-245BX", VehicleStatus.AVAILABLE);
+        when(vehicleRepository.existsByPlateNumber("KJA-245BX")).thenReturn(false);
+        when(vehicleRepository.save(any())).thenReturn(saved);
+
+        vehicleService.registerVehicle(req);
+
+        ArgumentCaptor<Vehicle> captor = ArgumentCaptor.forClass(Vehicle.class);
+        verify(vehicleRepository).save(captor.capture());
+        assertThat(captor.getValue().getPlateNumber()).isEqualTo("KJA-245BX");
+    }
+
+    @Test
+    void registerVehicle_plateWithSpaces_isTrimmedAndNormalized() {
+        VehicleRequest req = new VehicleRequest();
+        req.setMake("Honda");
+        req.setModel("CRV");
+        req.setPlateNumber("  PHC-112AA  ");
+        req.setMilestoneInterval(3000.0);
+
+        Vehicle saved = vehicle(1L, "Honda", "CRV", "PHC-112AA", VehicleStatus.AVAILABLE);
+        when(vehicleRepository.existsByPlateNumber("PHC-112AA")).thenReturn(false);
+        when(vehicleRepository.save(any())).thenReturn(saved);
+
+        vehicleService.registerVehicle(req);
+
+        ArgumentCaptor<Vehicle> captor = ArgumentCaptor.forClass(Vehicle.class);
+        verify(vehicleRepository).save(captor.capture());
+        assertThat(captor.getValue().getPlateNumber()).isEqualTo("PHC-112AA");
     }
 
     // ── getAllVehicles ───────────────────────────────────────────────────────

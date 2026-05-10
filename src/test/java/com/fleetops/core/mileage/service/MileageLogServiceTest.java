@@ -8,6 +8,8 @@ import com.fleetops.core.mileage.dto.MileageLogRequest;
 import com.fleetops.core.mileage.dto.MileageLogResponse;
 import com.fleetops.core.mileage.entity.MileageLog;
 import com.fleetops.core.mileage.repository.MileageLogRepository;
+import com.fleetops.core.triprequest.enums.TripRequestStatus;
+import com.fleetops.core.triprequest.repository.TripRequestRepository;
 import com.fleetops.core.user.entity.User;
 import com.fleetops.core.user.enums.UserRole;
 import com.fleetops.core.user.repository.UserRepository;
@@ -40,6 +42,7 @@ class MileageLogServiceTest {
     @Mock private MileageLogRepository mileageLogRepository;
     @Mock private VehicleRepository vehicleRepository;
     @Mock private UserRepository userRepository;
+    @Mock private TripRequestRepository tripRequestRepository;
     @Mock private MaintenanceEventProducer maintenanceEventProducer;
 
     @InjectMocks private MileageLogService mileageLogService;
@@ -55,11 +58,12 @@ class MileageLogServiceTest {
     void submitLog_success_setsOdometerDirectlyAndSavesLog() {
         mockSecurityContext("staff@fleetops.com");
         User staff = staff(1L, "staff@fleetops.com");
-        // Vehicle currently at 4,000 km — field staff reports odometer reading of 4,500
         Vehicle vehicle = vehicle(10L, 4000.0, 5000.0);
 
         when(userRepository.findByEmail("staff@fleetops.com")).thenReturn(Optional.of(staff));
         when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+        when(tripRequestRepository.existsByFieldStaffIdAndVehicleIdAndStatus(1L, 10L, TripRequestStatus.COMPLETED))
+                .thenReturn(true);
         when(vehicleRepository.save(any())).thenAnswer(i -> i.getArgument(0));
         when(mileageLogRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
@@ -72,18 +76,36 @@ class MileageLogServiceTest {
     }
 
     @Test
+    void submitLog_noCompletedTrip_throwsConflict() {
+        mockSecurityContext("staff@fleetops.com");
+        User staff = staff(1L, "staff@fleetops.com");
+        Vehicle vehicle = vehicle(10L, 4000.0, 5000.0);
+
+        when(userRepository.findByEmail("staff@fleetops.com")).thenReturn(Optional.of(staff));
+        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+        when(tripRequestRepository.existsByFieldStaffIdAndVehicleIdAndStatus(1L, 10L, TripRequestStatus.COMPLETED))
+                .thenReturn(false);
+
+        assertThatThrownBy(() -> mileageLogService.submitLog(logRequest(10L, 4500.0)))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("completed trip");
+        verify(mileageLogRepository, never()).save(any());
+    }
+
+    @Test
     void submitLog_milestoneReached_publishesMaintenanceEvent() {
         mockSecurityContext("staff@fleetops.com");
         User staff = staff(1L, "staff@fleetops.com");
         User manager = manager(2L, "manager@fleetops.com");
-        // Vehicle currently at 4,900 km — odometer now reads 5,100 → crosses the 5,000 km milestone
         Vehicle vehicle = vehicle(10L, 4900.0, 5000.0);
 
         when(userRepository.findByEmail("staff@fleetops.com")).thenReturn(Optional.of(staff));
         when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+        when(tripRequestRepository.existsByFieldStaffIdAndVehicleIdAndStatus(1L, 10L, TripRequestStatus.COMPLETED))
+                .thenReturn(true);
         when(vehicleRepository.save(any())).thenAnswer(i -> i.getArgument(0));
         when(mileageLogRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(userRepository.findByRole(UserRole.FLEET_MANAGER)).thenReturn(List.of(manager));
+        when(userRepository.findByRoleAndActiveTrue(UserRole.FLEET_MANAGER)).thenReturn(List.of(manager));
 
         mileageLogService.submitLog(logRequest(10L, 5100.0));
 
@@ -99,11 +121,13 @@ class MileageLogServiceTest {
     @Test
     void submitLog_milestoneNotReached_doesNotPublish() {
         mockSecurityContext("staff@fleetops.com");
-        // old=4000, reported=4100 — same 5,000 km interval block, no crossing
+        User staff = staff(1L, "staff@fleetops.com");
         Vehicle vehicle = vehicle(10L, 4000.0, 5000.0);
 
-        when(userRepository.findByEmail("staff@fleetops.com")).thenReturn(Optional.of(staff(1L, "staff@fleetops.com")));
+        when(userRepository.findByEmail("staff@fleetops.com")).thenReturn(Optional.of(staff));
         when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+        when(tripRequestRepository.existsByFieldStaffIdAndVehicleIdAndStatus(1L, 10L, TripRequestStatus.COMPLETED))
+                .thenReturn(true);
         when(vehicleRepository.save(any())).thenAnswer(i -> i.getArgument(0));
         when(mileageLogRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
@@ -113,15 +137,18 @@ class MileageLogServiceTest {
     }
 
     @Test
-    void submitLog_milestoneReached_noFleetManager_doesNotPublish() {
+    void submitLog_milestoneReached_noActiveFleetManager_doesNotPublish() {
         mockSecurityContext("staff@fleetops.com");
+        User staff = staff(1L, "staff@fleetops.com");
         Vehicle vehicle = vehicle(10L, 4900.0, 5000.0);
 
-        when(userRepository.findByEmail("staff@fleetops.com")).thenReturn(Optional.of(staff(1L, "staff@fleetops.com")));
+        when(userRepository.findByEmail("staff@fleetops.com")).thenReturn(Optional.of(staff));
         when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+        when(tripRequestRepository.existsByFieldStaffIdAndVehicleIdAndStatus(1L, 10L, TripRequestStatus.COMPLETED))
+                .thenReturn(true);
         when(vehicleRepository.save(any())).thenAnswer(i -> i.getArgument(0));
         when(mileageLogRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        when(userRepository.findByRole(UserRole.FLEET_MANAGER)).thenReturn(List.of());
+        when(userRepository.findByRoleAndActiveTrue(UserRole.FLEET_MANAGER)).thenReturn(List.of());
 
         mileageLogService.submitLog(logRequest(10L, 5100.0));
 
@@ -131,11 +158,13 @@ class MileageLogServiceTest {
     @Test
     void submitLog_reportedMileageLowerThanCurrent_throwsConflict() {
         mockSecurityContext("staff@fleetops.com");
-        // Vehicle recorded at 5,000 km — submitting 4,800 is going backwards
+        User staff = staff(1L, "staff@fleetops.com");
         Vehicle vehicle = vehicle(10L, 5000.0, 8000.0);
 
-        when(userRepository.findByEmail("staff@fleetops.com")).thenReturn(Optional.of(staff(1L, "staff@fleetops.com")));
+        when(userRepository.findByEmail("staff@fleetops.com")).thenReturn(Optional.of(staff));
         when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+        when(tripRequestRepository.existsByFieldStaffIdAndVehicleIdAndStatus(1L, 10L, TripRequestStatus.COMPLETED))
+                .thenReturn(true);
 
         assertThatThrownBy(() -> mileageLogService.submitLog(logRequest(10L, 4800.0)))
                 .isInstanceOf(ConflictException.class)
@@ -147,11 +176,13 @@ class MileageLogServiceTest {
     @Test
     void submitLog_reportedMileageEqualToCurrent_accepted() {
         mockSecurityContext("staff@fleetops.com");
-        // Reporting the same mileage again is allowed (idempotent re-submission)
+        User staff = staff(1L, "staff@fleetops.com");
         Vehicle vehicle = vehicle(10L, 5000.0, 8000.0);
 
-        when(userRepository.findByEmail("staff@fleetops.com")).thenReturn(Optional.of(staff(1L, "staff@fleetops.com")));
+        when(userRepository.findByEmail("staff@fleetops.com")).thenReturn(Optional.of(staff));
         when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+        when(tripRequestRepository.existsByFieldStaffIdAndVehicleIdAndStatus(1L, 10L, TripRequestStatus.COMPLETED))
+                .thenReturn(true);
         when(vehicleRepository.save(any())).thenAnswer(i -> i.getArgument(0));
         when(mileageLogRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 

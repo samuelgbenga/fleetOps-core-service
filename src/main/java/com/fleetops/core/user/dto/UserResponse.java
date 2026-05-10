@@ -1,5 +1,6 @@
 package com.fleetops.core.user.dto;
 
+import com.fleetops.core.media.dto.MediaResponse;
 import com.fleetops.core.user.entity.User;
 import com.fleetops.core.user.enums.UserRole;
 import lombok.Builder;
@@ -14,6 +15,8 @@ public class UserResponse {
     private String name;
     private String email;
     private UserRole role;
+    private boolean active;
+    private MediaResponse profileMedia;
     private LocalDateTime createdAt;
 
     public static UserResponse from(User user) {
@@ -22,6 +25,8 @@ public class UserResponse {
                 .name(user.getName())
                 .email(user.getEmail())
                 .role(user.getRole())
+                .active(user.isActive())
+                .profileMedia(MediaResponse.from(user.getProfileMedia()))
                 .createdAt(user.getCreatedAt())
                 .build();
     }

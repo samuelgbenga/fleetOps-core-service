@@ -1,13 +1,11 @@
 package com.fleetops.core.user.dto;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
+import com.fleetops.core.validation.ValidPassword;
 import lombok.Data;
 
 @Data
 public class ResetPasswordRequest {
 
-    @NotBlank(message = "New password is required")
-    @Size(min = 8, message = "Password must be at least 8 characters")
+    @ValidPassword
     private String newPassword;
 }

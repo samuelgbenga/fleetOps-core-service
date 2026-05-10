@@ -46,4 +46,18 @@ public class UserController {
         userService.resetPassword(id, request);
         return ResponseEntity.noContent().build();
     }
+
+    @PatchMapping("/{id}/deactivate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deactivateUser(@PathVariable Long id) {
+        userService.deactivateUser(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{id}/reactivate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> reactivateUser(@PathVariable Long id) {
+        userService.reactivateUser(id);
+        return ResponseEntity.noContent().build();
+    }
 }

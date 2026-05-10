@@ -122,3 +122,159 @@ an email notification that the task has been completed.
 there should be that state to.
 and also has the
 
+
+===================================================
+Tests. notifications.
+fleet manager notifications (push notification for future consideration)
+- should get email/push notification that a request has been made
+- should get notify of mileage reach (email/push notification)
+- should get notification of mileage completed (email/push notificaton)
+
+field staff notification:
+- should get notified for acceptance of trip accepted.
+- should get notified when a request is now available to make for a particular
+unavailable vehicle (- future consideration : push notification best for this)
+
+All Staff notification
+- Upon registration
+
+
+
+- Admin token:
+eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiUk9MRV9BRE1JTiIsInN1YiI6ImFkbWluQGZsZWV0b3BzLmNvbSIsImlhdCI6MTc3ODI3NzQ3MywiZXhwIjoxNzc4MzYzODczfQ.yaPuMMhbCGl7p6R-cx1D7zLV6Ctq1rHdzuG_cpc8F84
+
+
+- field staff:
+eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiUk9MRV9GSUVMRF9TVEFGRiIsInN1YiI6InNhbXVlbGdiZW5nYXNuckBnbWFpbC5jb20iLCJpYXQiOjE3NzgyNzg2ODIsImV4cCI6MTc3ODM2NTA4Mn0.g5EcKaqP90o4OOlS2vHSn-uiQauXNaFknpEKttjyYKA
+
+
+Two more things you need to do a validator for password
+and a validtor for plate numbers.
+
+What you did id nonensens.
+any password can be used.
+no password validator. to check the average formate of allowed password.
+
+A standard Nigerian private vehicle plate number follows the structure ABC-123DE, where the first three uppercase letters (ABC) represent an approved Local Government Area (LGA) registration code, followed by a hyphen, then a three-digit sequential number from 001 to 999, and finally two uppercase suffix letters used to expand the number of unique combinations; for example, KJA-245BX where KJA identifies the registration LGA, 245 is the numeric sequence, and BX is the alphabetic suffix.
+
+
+
+one of the questions that could be raised .
+was why didnt we make it such that a vehicle should be approved time based.
+that is an approved triprequest for lets say two months in the future.
+should not prevent that vehicle from being assined before the two months time.
+
+now the reasone why we did not go throught that route.
+was because we rely on the judgement of the fleetmanager who understands the
+health of all the fleet under is management.
+we expect that the approval a vehicle request is based on the health readiness of that vehicle
+so an approval for a trip two months in the future should - would be that the vehicle
+healt would be fit for that trip in two months so accepting a trip request within that
+two months would definetly affect the health  of that vehicle.
+
+
+
+what is available to be log.
+.
+when is a car available to be logged is it after completion og a trip.
+is it should only be available to be after trip completion.
+so you check the date time of the trip.
+
+also is there an endpoint to fetch approved vehicle for a particular field staff.
+
+a field staff and a fleet manager should be able to
+toggle the trip request to completed.
+-
+this should be two endpoints.
+the fleet manager should be able to do so even before the end date of the triprequest.
+this is so they can withdraw a  vehicle from a field staff even before time.
+There should be an optional field for mileage (this is because the vehcile could be withdrawn amidst transit of the vehicle so it should be optional) submission for this endpoint that the fleet manager use.
+you know what the above endpoint should be open to both the field staff and the
+fleetmanager. so they can boot toggle and submint the milleaged. themself but the mileage submission. at this point should be optional.
+two endpoint is not needed one will do.
+
+
+also we the mileage tracker is not to track for stolen cars or if a vehcile as goon
+beyond the trips. is to track when a vehicle is due for maintainance after it as reached
+a certian configured value by the fleetmanager or admin.
+so its basically to schedule vehicle for mainatance based on mileage covered.
+
+
+
+Pooling message mechanism:
+for fleet manager to be able to chat with the mainatance team.
+
+currently how is the maintance team flaged for mainatance:
+
+can a conversation be established between the maintenance team
+and the fleet manager.
+so the fleet manager gets updated of the vehicle realtime also through chat
+not just but updating status as we already have.
+so instead of the mantainance team having to converst of the applicationd.
+they can have a realtime update discussion on the that particular mainatance task.
+
+let me know if this is possible (note we are not using websocket. basic polling will do)
+after the maintance is completed the conversation is locked blocked.
+it can be opened but it will be blocked from new messages after that particulare maintenance
+ticket has been completed/approved by the fleetmanager.
+after which the will be no more polling for that conversation.
+
+(also let me know will the polling be done on the frontend or the backend?)
+
+is this possible.
+just let me  know the the changes that will be done.
+
+can we also use kafka:
+to send life streaming events to admin:
+like events like:
+Feilds staff request>
+Feilds Staff request for approval>
+fields staff submit mileage report for completed trip:
+Fleet was scheduled for maintainance>
+Fleet maintance completed:
+Fleet configured Mileage updated after maintainance.
+
+can we design this such that the admin get this streams as a report:
+this in realtime using kafka just the way kafka work.
+so what  i am picturing is a dashboard with this individual report.
+there should do you get what i mean?
+
+because admin is suppose to be seeing a live update of vehicle as they are being used.
+each logs on the adming dashboard can be marked by date and the vehicle plate number.
+so admin will be able to search by plate number and/date to get the state of the vehicle
+to get the health check of that vehicle?
+do you understand what i am tryting to archiive.
+we should be able to archive this with kafka right
+
+The frontend will need poolling for this.
+
+------------- This aare the last feature.
+Lastly to cap it all up:
+add profile pictures to user (it is optional a String)
+also add a List photoUrls for vehicle (this should also be a string)
+
+
+You will explain update the user story:
+reasone behind our decision:
+The url: a user should be able to upload there profile picture:
+
+The vehicleUrls: to be able to upload different multiple picture of that
+vehicle to show case different angles
+
+: converstation:
+so fleet manager could be able to get sort progress
+update on what is going with the vehicle maintanance:
+and an avenue for them to push the mainatance team or keep tabs on the
+mainance.
+
+: Admin realtime report logs:
+we pusblished every events arround the fleet: -
+to kafka and then consumer it from the main service and stored into the db
+and then with polling the frontend pull this information to the adming dashboard.
+
+so instead of updating a field.
+we should have a media Entity.
+this should contain the urlId from claudinary and the url itself.
+for user it should mapped one to one.
+and for vehicle it should be one to many: one vehicle can have many media
+i should be able to get the user url from the user (unidirectional) same with the vehicle.

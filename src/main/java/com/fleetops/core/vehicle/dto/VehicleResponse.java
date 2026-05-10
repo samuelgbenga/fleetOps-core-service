@@ -1,5 +1,6 @@
 package com.fleetops.core.vehicle.dto;
 
+import com.fleetops.core.media.dto.MediaResponse;
 import com.fleetops.core.vehicle.entity.Vehicle;
 import com.fleetops.core.vehicle.enums.VehicleStatus;
 import lombok.Builder;
@@ -18,6 +19,7 @@ public class VehicleResponse {
     private Double currentMileage;
     private Double milestoneInterval;
     private VehicleStatus status;
+    private List<MediaResponse> mediaFiles;
     private List<ServiceHistoryResponse> serviceHistories;
     private LocalDateTime registeredAt;
 
@@ -30,6 +32,7 @@ public class VehicleResponse {
                 .currentMileage(v.getCurrentMileage())
                 .milestoneInterval(v.getMilestoneInterval())
                 .status(v.getStatus())
+                .mediaFiles(MediaResponse.fromList(v.getMediaFiles()))
                 .serviceHistories(List.of())
                 .registeredAt(v.getRegisteredAt())
                 .build();
@@ -44,6 +47,7 @@ public class VehicleResponse {
                 .currentMileage(v.getCurrentMileage())
                 .milestoneInterval(v.getMilestoneInterval())
                 .status(v.getStatus())
+                .mediaFiles(MediaResponse.fromList(v.getMediaFiles()))
                 .serviceHistories(histories)
                 .registeredAt(v.getRegisteredAt())
                 .build();

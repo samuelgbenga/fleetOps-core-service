@@ -12,6 +12,7 @@ import java.util.List;
 public interface TripRequestRepository extends JpaRepository<TripRequest, Long> {
     List<TripRequest> findByStatus(TripRequestStatus status);
     List<TripRequest> findByFieldStaffId(Long fieldStaffId);
+    List<TripRequest> findByFieldStaffIdAndStatus(Long fieldStaffId, TripRequestStatus status);
     List<TripRequest> findByVehicleIdAndStatus(Long vehicleId, TripRequestStatus status);
     boolean existsByFieldStaffIdAndVehicleIdAndStatus(Long fieldStaffId, Long vehicleId, TripRequestStatus status);
     List<TripRequest> findByStatusAndStartDateBefore(TripRequestStatus status, LocalDate date);

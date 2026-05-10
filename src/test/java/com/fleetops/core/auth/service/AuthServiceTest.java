@@ -17,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
@@ -100,6 +101,20 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.login(request))
                 .isInstanceOf(BadCredentialsException.class);
+        verify(userRepository, never()).findByEmail(any());
+    }
+
+    @Test
+    void login_deactivatedAccount_propagatesDisabledException() {
+        when(authenticationManager.authenticate(any()))
+                .thenThrow(new DisabledException("User is disabled"));
+
+        LoginRequest request = new LoginRequest();
+        request.setEmail("inactive@fleetops.com");
+        request.setPassword("anypass");
+
+        assertThatThrownBy(() -> authService.login(request))
+                .isInstanceOf(DisabledException.class);
         verify(userRepository, never()).findByEmail(any());
     }
 

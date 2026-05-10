@@ -1,5 +1,6 @@
 package com.fleetops.core.vehicle.dto;
 
+import com.fleetops.core.validation.ValidPlateNumber;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
@@ -12,8 +13,8 @@ public class VehicleRequest {
     @NotBlank(message = "Model is required")
     private String model;
 
-    @NotBlank(message = "Plate number is required")
+    @ValidPlateNumber
     private String plateNumber;
 
-    private Double milestoneInterval; // defaults to 5000 if null
+    private Double milestoneInterval;
 }

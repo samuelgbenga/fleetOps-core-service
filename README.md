@@ -17,13 +17,18 @@ Swagger UI (interactive docs): `http://localhost:8080/swagger-ui/index.html`
 
 - [Auth](#auth)
 - [Users](#users)
+- [User Profile](#user-profile)
 - [Password Management](#password-management)
 - [Vehicles](#vehicles)
 - [Trip Requests](#trip-requests)
 - [Mileage Logs](#mileage-logs)
 - [Maintenance Flags](#maintenance-flags)
+- [Maintenance Chat](#maintenance-chat)
 - [Vehicle Assignments](#vehicle-assignments)
+- [Vehicle Activity Dashboard](#vehicle-activity-dashboard)
+- [Media Management](#media-management)
 - [Admin Reports](#admin-reports)
+- [Email Notifications](#email-notifications)
 - [Quick-Start Flow](#quick-start-flow)
 
 ---
@@ -147,10 +152,96 @@ Hard-sets any user's password without requiring the current one. Use this for ac
 ### `GET /api/admin/users`
 **Role:** `ADMIN`
 
+Returns all users including deactivated ones. Each user object includes an `active` field indicating account status.
+
 ---
 
 ### `GET /api/admin/users/{id}`
 **Role:** `ADMIN`
+
+---
+
+### `PATCH /api/admin/users/{id}/deactivate`
+**Role:** `ADMIN`
+
+Soft-deletes a user account. The user record is retained in the database but the account is blocked from logging in.
+
+- Returns `204 No Content` on success
+- Returns `404` if the user does not exist
+- Returns `409 Conflict` if the account is already deactivated
+
+**Response:** `204 No Content`
+
+---
+
+### `PATCH /api/admin/users/{id}/reactivate`
+**Role:** `ADMIN`
+
+Restores a previously deactivated account.
+
+- Returns `204 No Content` on success
+- Returns `404` if the user does not exist
+- Returns `409 Conflict` if the account is already active
+
+**Response:** `204 No Content`
+
+> Deactivated users attempting to log in receive `401 Unauthorized` with the message `"Account is deactivated. Please contact an administrator."`
+
+---
+
+## User Profile
+
+Any authenticated user can view and update their own profile without going through an admin endpoint.
+
+### `GET /api/users/me`
+**Role:** Any authenticated user
+
+Returns the authenticated user's own profile information.
+
+---
+
+### `PATCH /api/users/me`
+**Role:** Any authenticated user
+
+Updates the authenticated user's display name. Email address cannot be changed via this endpoint.
+
+```json
+{
+  "name": "John Adeyemi Jr."
+}
+```
+
+---
+
+### `PATCH /api/users/me/media`
+**Role:** Any authenticated user
+
+Sets or replaces the authenticated user's profile picture (Cloudinary-hosted). Replaces any existing entry.
+
+```json
+{
+  "publicId": "fleetops/users/profile-123",
+  "url": "https://res.cloudinary.com/demo/image/upload/v1/fleetops/users/profile-123.jpg"
+}
+```
+
+**Response**
+```json
+{
+  "id": 5,
+  "publicId": "fleetops/users/profile-123",
+  "url": "https://res.cloudinary.com/demo/image/upload/v1/fleetops/users/profile-123.jpg"
+}
+```
+
+---
+
+### `DELETE /api/users/me/media`
+**Role:** Any authenticated user
+
+Removes the authenticated user's profile picture. Returns `409 Conflict` if no profile media is currently set.
+
+**Response:** `204 No Content`
 
 ---
 
@@ -160,6 +251,26 @@ Each vehicle has a **milestone interval** — the odometer reading (km) at which
 
 Service history is recorded automatically when the fleet manager approves a completed maintenance. See [Maintenance Flags](#maintenance-flags).
 
+### Plate Number Format
+
+Plate numbers follow the **Nigerian private vehicle standard**:
+
+```
+KJA-245BX
+^^^         — 3-letter LGA registration code (e.g. KJA = Ikeja, Lagos)
+    ^^^     — 3-digit sequence number (001–999)
+       ^^   — 2-letter suffix
+```
+
+**Validation rules:**
+- Input is trimmed and converted to uppercase automatically
+- The 3-letter prefix must be a recognised LGA code (seeded from `nigeria_plate_codes.csv` on startup)
+- Sequence number must be between `001` and `999` — `000` is rejected
+- Returns `400 Bad Request` if the format is invalid or the LGA prefix is unrecognised
+- Returns `409 Conflict` if the plate number is already registered
+
+---
+
 ### `POST /api/vehicles`
 **Role:** `FLEET_MANAGER`, `ADMIN`
 
@@ -168,7 +279,7 @@ Service history is recorded automatically when the fleet manager approves a comp
 {
   "make": "Toyota",
   "model": "Land Cruiser",
-  "plateNumber": "LG-245-KJA"
+  "plateNumber": "KJA-245BX"
 }
 ```
 
@@ -177,7 +288,7 @@ Service history is recorded automatically when the fleet manager approves a comp
 {
   "make": "Ford",
   "model": "Ranger",
-  "plateNumber": "ABJ-112-FCT",
+  "plateNumber": "PHC-112AA",
   "milestoneInterval": 5000
 }
 ```
@@ -209,7 +320,7 @@ Returns the vehicle with its full service history (most recent first).
   "id": 1,
   "make": "Toyota",
   "model": "Land Cruiser",
-  "plateNumber": "LG-245-KJA",
+  "plateNumber": "KJA-245BX",
   "currentMileage": 6200.0,
   "milestoneInterval": 6000.0,
   "status": "AVAILABLE",
@@ -285,7 +396,12 @@ A field staff member submits a trip request for a specific vehicle and date rang
 ---
 
 ### `GET /api/trip-requests/my`
-**Role:** `FIELD_STAFF` — returns the authenticated user's own requests
+**Role:** `FIELD_STAFF` — returns the authenticated user's own requests across all statuses
+
+---
+
+### `GET /api/trip-requests/my/approved`
+**Role:** `FIELD_STAFF` — returns only the authenticated user's `APPROVED` trips (i.e. the vehicle(s) currently assigned to them)
 
 ---
 
@@ -302,15 +418,30 @@ Approves a `PENDING` trip request. Creates a `VehicleAssignment`, sets the vehic
 ---
 
 ### `PATCH /api/trip-requests/{id}/complete`
-**Role:** `FLEET_MANAGER`
+**Role:** `FIELD_STAFF` (own trip only) · `FLEET_MANAGER` · `ADMIN`
 
 Marks an `APPROVED` trip as completed. Sets the vehicle status back to `AVAILABLE`.
+
+- A field staff member can only complete **their own** trip — returns `403 Forbidden` if they attempt to complete another staff member's trip.
+- Fleet managers and admins can complete **any** approved trip, including before the `endDate` (e.g. early vehicle withdrawal).
+
+Accepts an **optional** JSON body:
+```json
+{
+  "reportedMileage": 4350.0
+}
+```
+
+- If `reportedMileage` is supplied it must be **≥** the vehicle's currently recorded mileage — returns `409` otherwise. The vehicle's `currentMileage` is updated and a `MileageLog` entry is created in the same request.
+- If the body is omitted (or `reportedMileage` is `null`), the trip completes with no mileage update; a separate `POST /api/mileage-logs` call can be used afterwards.
 
 ---
 
 ## Mileage Logs
 
-After a trip is completed, the field staff submits the vehicle's current **odometer reading**. This is not a per-trip delta — it is the absolute reading from the vehicle's odometer. The system sets the vehicle's `currentMileage` directly to this value.
+After a trip is completed (fleet manager calls `PATCH /{id}/complete`), the field staff submits the vehicle's current **odometer reading**. This is not a per-trip delta — it is the absolute reading from the vehicle's odometer. The system sets the vehicle's `currentMileage` directly to this value.
+
+**Mileage logging is only permitted after trip completion.** The system verifies that the submitting field staff has a `COMPLETED` trip for that vehicle before accepting the log. Attempting to log mileage without a completed trip returns `409 Conflict`.
 
 If the new reading causes the vehicle to cross its configured `milestoneInterval`, a `MaintenanceFlagCreatedEvent` is published to Kafka. The consumer creates a maintenance flag, sets the vehicle to `MAINTENANCE` (blocking future trip requests), and notifies the fleet manager — all asynchronously.
 
@@ -458,12 +589,149 @@ On success: creates a `ServiceHistory` record, updates the vehicle's milestone i
 
 ---
 
+## Maintenance Chat
+
+Messages sent within a maintenance flag. The conversation is locked once the flag is `RESOLVED` — no new messages can be posted, but the history remains readable.
+
+### `POST /api/maintenance-flags/{flagId}/messages`
+**Role:** `MAINTENANCE_TEAM`, `FLEET_MANAGER`, `ADMIN`
+
+Sends a message to the flag conversation. Returns `409 Conflict` if the flag is `RESOLVED`.
+
+```json
+{
+  "message": "Brake pads have arrived. Starting installation now."
+}
+```
+
+**Response (201 Created)**
+```json
+{
+  "id": 3,
+  "flagId": 7,
+  "senderId": 5,
+  "senderName": "Chidi Nwosu",
+  "senderRole": "MAINTENANCE_TEAM",
+  "message": "Brake pads have arrived. Starting installation now.",
+  "sentAt": "2026-05-10T11:23:00"
+}
+```
+
+---
+
+### `GET /api/maintenance-flags/{flagId}/messages`
+**Role:** `MAINTENANCE_TEAM`, `FLEET_MANAGER`, `ADMIN`
+
+Returns all messages for a flag ordered oldest → newest. Works for both active and `RESOLVED` flags.
+
+---
+
 ## Vehicle Assignments
 
 ### `GET /api/assignments/vehicle/{vehicleId}`
 **Role:** `FLEET_MANAGER`, `ADMIN`
 
 Returns the assignment history for a vehicle.
+
+---
+
+## Vehicle Activity Dashboard
+
+### `GET /api/admin/activity-logs`
+**Role:** `ADMIN`
+
+Returns vehicle activity events newest first. Supports optional query parameters.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `plateNumber` | string | Filter by vehicle plate number |
+| `date` | `YYYY-MM-DD` | Filter to a single calendar day |
+
+Both can be combined: `?plateNumber=KJA-001AB&date=2026-05-10`
+
+**Sample Response**
+```json
+[
+  {
+    "id": 12,
+    "vehicleId": 2,
+    "plateNumber": "KJA-001AB",
+    "eventType": "TRIP_REQUESTED",
+    "description": "Emeka Obi (FIELD_STAFF) requested vehicle KJA-001AB for destination: Abuja (12 May – 15 May)",
+    "actorName": "Emeka Obi",
+    "actorRole": "FIELD_STAFF",
+    "occurredAt": "2026-05-10T09:14:00"
+  }
+]
+```
+
+**Events logged:**
+
+| Event type | Triggered by |
+|---|---|
+| `TRIP_REQUESTED` | Field staff submits a trip request |
+| `TRIP_APPROVED` | Fleet manager approves a trip |
+| `TRIP_REJECTED` | Manual or auto-conflict rejection |
+| `MILEAGE_SUBMITTED` | Field staff or fleet manager submits odometer reading |
+| `MAINTENANCE_SCHEDULED` | System — mileage milestone crossed |
+| `MAINTENANCE_COMPLETED` | Maintenance team marks work done |
+| `MILESTONE_UPDATED` | Fleet manager approves maintenance + sets new interval |
+
+---
+
+## Media Management
+
+Admin can manage any user's profile picture. Fleet managers and admins can manage vehicle photos.
+
+### `PATCH /api/admin/users/{id}/media`
+**Role:** `ADMIN`
+
+Sets or replaces the profile picture for any user.
+
+```json
+{
+  "publicId": "fleetops/users/profile-456",
+  "url": "https://res.cloudinary.com/demo/image/upload/v1/fleetops/users/profile-456.jpg"
+}
+```
+
+---
+
+### `DELETE /api/admin/users/{id}/media`
+**Role:** `ADMIN`
+
+Removes a user's profile picture. Returns `409 Conflict` if no media is set.
+
+**Response:** `204 No Content`
+
+---
+
+### `POST /api/vehicles/{id}/media`
+**Role:** `FLEET_MANAGER`, `ADMIN`
+
+Adds one or more photos to a vehicle. Appends to any existing photos.
+
+```json
+[
+  {
+    "publicId": "fleetops/vehicles/v2-front",
+    "url": "https://res.cloudinary.com/demo/image/upload/v1/fleetops/vehicles/v2-front.jpg"
+  },
+  {
+    "publicId": "fleetops/vehicles/v2-side",
+    "url": "https://res.cloudinary.com/demo/image/upload/v1/fleetops/vehicles/v2-side.jpg"
+  }
+]
+```
+
+---
+
+### `DELETE /api/vehicles/{id}/media/{mediaId}`
+**Role:** `FLEET_MANAGER`, `ADMIN`
+
+Removes a specific photo from a vehicle by its media ID. Returns `404` if the media entry is not found on that vehicle.
+
+**Response:** `204 No Content`
 
 ---
 
@@ -494,7 +762,7 @@ Returns the assignment history for a vehicle.
 [
   {
     "vehicleId": 1,
-    "plateNumber": "LG-245-KJA",
+    "plateNumber": "KJA-245BX",
     "make": "Toyota",
     "model": "Land Cruiser",
     "currentMileage": 3200.0,
@@ -504,7 +772,7 @@ Returns the assignment history for a vehicle.
   },
   {
     "vehicleId": 3,
-    "plateNumber": "ABJ-112-FCT",
+    "plateNumber": "PHC-112AA",
     "make": "Ford",
     "model": "Ranger",
     "currentMileage": 5850.0,
@@ -517,11 +785,29 @@ Returns the assignment history for a vehicle.
 
 ---
 
+## Email Notifications
+
+All notifications are sent **asynchronously** via Kafka and do not block the primary API response.
+
+| Event                                            | Recipient                                      |
+|--------------------------------------------------|------------------------------------------------|
+| Account created                                  | Newly registered user (welcome email)          |
+| Trip request submitted                           | All fleet managers                             |
+| Trip request approved                            | Field staff who submitted                      |
+| Trip request rejected (manual or auto-conflict)  | Field staff who submitted                      |
+| Maintenance flag assigned                        | Maintenance team member assigned               |
+| Maintenance progress update                      | Fleet manager who assigned the flag            |
+| Maintenance work marked done                     | Fleet manager who assigned the flag            |
+| Maintenance approved                             | Maintenance team member who did the work       |
+| Vehicle mileage milestone reached                | All fleet managers                             |
+
+---
+
 ## Quick-Start Flow
 
 ```
  1.  Login as ADMIN              POST /api/auth/login
- 2.  Create users                POST /api/admin/users          (one per role)
+ 2.  Create users                POST /api/admin/users              (one per role)
      └─ reset any password       PATCH /api/admin/users/{id}/reset-password
  3a. (Optional) Change own pwd  PATCH /api/auth/change-password
  3.  Login as FLEET_MANAGER      POST /api/auth/login
@@ -531,11 +817,13 @@ Returns the assignment history for a vehicle.
  7.  Submit trip request         POST /api/trip-requests
  8.  Login as FLEET_MANAGER      POST /api/auth/login
  9.  Approve trip                PATCH /api/trip-requests/{id}/approve
-10.  Login as FIELD_STAFF        POST /api/auth/login
-11.  Submit mileage log          POST /api/mileage-logs          (odometer reading)
+10.  Complete trip               PATCH /api/trip-requests/{id}/complete
+     └─ optionally include { "reportedMileage": ... } to capture odometer reading inline (skips step 11)
+     └─ FLEET_MANAGER / ADMIN can complete any trip; FIELD_STAFF can complete their own
+11.  Login as FIELD_STAFF        POST /api/auth/login
+12.  Submit mileage log          POST /api/mileage-logs             (if not submitted inline at step 10)
      └─ if milestone crossed → vehicle → MAINTENANCE, fleet manager notified via Kafka
-12.  Login as FLEET_MANAGER      POST /api/auth/login
-13.  Complete trip               PATCH /api/trip-requests/{id}/complete
+13.  Login as FLEET_MANAGER      POST /api/auth/login
 14.  Assign maintenance flag     PATCH /api/maintenance-flags/{id}/assign
 15.  Login as MAINTENANCE_TEAM   POST /api/auth/login
 16.  Update progress             PATCH /api/maintenance-flags/{id}/progress

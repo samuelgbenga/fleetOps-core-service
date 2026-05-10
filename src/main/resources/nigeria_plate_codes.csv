@@ -1,0 +1,116 @@
+code,lga,state
+AAA,Lagos Island,Lagos
+APP,Apapa,Lagos
+BDG,Badagry,Lagos
+EKY,Eti-Osa,Lagos
+EPE,Epe,Lagos
+FST,Amuwo-Odofin,Lagos
+GGE,Agege,Lagos
+AKD,Ibeju-Lekki,Lagos
+KJA,Ikeja,Lagos
+KRD,Ikorodu,Lagos
+KSF,Kosofe,Lagos
+KTU,Alimosho (Ikotun),Lagos
+LND,Lagos Mainland,Lagos
+LSD,Oshodi-Isolo,Lagos
+LSR,Surulere,Lagos
+MUS,Mushin,Lagos
+SMK,Somolu,Lagos
+FKJ,Ifako-Ijaiye,Lagos
+AGL,Ajeromi-Ifelodun,Lagos
+JJJ,Ojo,Lagos
+ABJ,Abuja Municipal,FCT
+BWR,Bwari,FCT
+GWG,Gwagwalada,FCT
+KJE,Kuje,FCT
+KWL,Kwali,FCT
+PHC,Port Harcourt,Rivers
+OBK,Obio-Akpor,Rivers
+ELE,Eleme,Rivers
+OMM,Omuma,Rivers
+BNY,Bonny,Rivers
+KAN,Kano Municipal,Kano
+FGE,Fagge,Kano
+NAS,Nassarawa,Kano
+TFA,Tarauni,Kano
+IBD,Ibadan,Oyo
+OLY,Oluyole,Oyo
+EGD,Egbeda,Oyo
+AKN,Akinyele,Oyo
+KAD,Kaduna,Kaduna
+ZAR,Zaria,Kaduna
+JMA,Jama’a,Kaduna
+KAF,Kafanchan,Kaduna
+ENU,Enugu North,Enugu
+NSK,Nsukka,Enugu
+UWN,Udi,Enugu
+AWK,Awka,Anambra
+NKW,Nnewi,Anambra
+ONT,Onitsha,Anambra
+ABC,Abeokuta,Ogun
+SAG,Sagamu,Ogun
+IJB,Ijebu-Ode,Ogun
+ASB,Asaba,Delta
+WRR,Warri,Delta
+UGH,Ughelli,Delta
+BEN,Benin City,Edo
+EKP,Ekpoma,Edo
+AUC,Auchi,Edo
+UMH,Umuahia,Abia
+ABA,Aba,Abia
+UKW,Ukwa,Abia
+UYY,Uyo,Akwa Ibom
+EKT,Eket,Akwa Ibom
+IMG,Ikot-Ekpene,Akwa Ibom
+CAL,Calabar,Cross River
+OGO,Ogoja,Cross River
+IKM,Ikom,Cross River
+OWR,Owerri,Imo
+OKG,Okigwe,Imo
+ORL,Orlu,Imo
+JOS,Jos,Plateau
+BSH,Bassa,Plateau
+PKN,Pankshin,Plateau
+ILR,Ilorin,Kwara
+OFF,Offa,Kwara
+OSH,Oshogbo,Osun
+ILE,Ilesa,Osun
+EDE,Ede,Osun
+AKR,Akure,Ondo
+OND,Ondo,Ondo
+OKE,Okitipupa,Ondo
+ADK,Ado-Ekiti,Ekiti
+IKR,Ikere,Ekiti
+MKD,Makurdi,Benue
+GBK,Gboko,Benue
+LAF,Lafia,Nasarawa
+KFF,Keffi,Nasarawa
+MIN,Minna,Niger
+BDA,Bida,Niger
+MDG,Maiduguri,Borno
+BIU,Biu,Borno
+SKT,Sokoto,Sokoto
+TBN,Tambuwal,Sokoto
+BRN,Birnin Kebbi,Kebbi
+YUR,Yauri,Kebbi
+GUS,Gusau,Zamfara
+KTA,Kaura-Namoda,Zamfara
+DAM,Damaturu,Yobe
+GSH,Gashua,Yobe
+YLA,Yola,Adamawa
+MUB,Mubi,Adamawa
+JAL,Jalingo,Taraba
+WKR,Wukari,Taraba
+YNG,Yenagoa,Bayelsa
+ABK,Abakaliki,Ebonyi
+AFK,Afikpo,Ebonyi
+DTS,Dutse,Jigawa
+HDE,Hadejia,Jigawa
+GME,Gombe,Gombe
+BLG,Billiri,Gombe
+KTN,Katsina,Katsina
+DSM,Daura,Katsina
+LKG,Lokoja,Kogi
+ANK,Ankpa,Kogi
+BCU,Bauchi,Bauchi
+ALK,Alkaleri,Bauchi
