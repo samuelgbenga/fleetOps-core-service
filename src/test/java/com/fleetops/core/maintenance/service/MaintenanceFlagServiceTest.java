@@ -4,6 +4,7 @@ import com.fleetops.core.exception.ConflictException;
 import com.fleetops.core.exception.ResourceNotFoundException;
 import com.fleetops.core.kafka.event.NotificationRequestEvent;
 import com.fleetops.core.kafka.producer.NotificationEventProducer;
+import com.fleetops.core.kafka.producer.VehicleActivityProducer;
 import com.fleetops.core.maintenance.dto.ApproveFlagRequest;
 import com.fleetops.core.maintenance.dto.AssignFlagRequest;
 import com.fleetops.core.maintenance.dto.MaintenanceFlagResponse;
@@ -45,6 +46,7 @@ class MaintenanceFlagServiceTest {
     @Mock private VehicleRepository vehicleRepository;
     @Mock private ServiceHistoryRepository serviceHistoryRepository;
     @Mock private NotificationEventProducer notificationEventProducer;
+    @Mock private VehicleActivityProducer vehicleActivityProducer;
 
     @InjectMocks private MaintenanceFlagService maintenanceFlagService;
 

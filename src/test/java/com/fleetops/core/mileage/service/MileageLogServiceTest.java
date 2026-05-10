@@ -4,6 +4,7 @@ import com.fleetops.core.exception.ConflictException;
 import com.fleetops.core.exception.ResourceNotFoundException;
 import com.fleetops.core.kafka.event.MaintenanceFlagCreatedEvent;
 import com.fleetops.core.kafka.producer.MaintenanceEventProducer;
+import com.fleetops.core.kafka.producer.VehicleActivityProducer;
 import com.fleetops.core.mileage.dto.MileageLogRequest;
 import com.fleetops.core.mileage.dto.MileageLogResponse;
 import com.fleetops.core.mileage.entity.MileageLog;
@@ -44,6 +45,7 @@ class MileageLogServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private TripRequestRepository tripRequestRepository;
     @Mock private MaintenanceEventProducer maintenanceEventProducer;
+    @Mock private VehicleActivityProducer vehicleActivityProducer;
 
     @InjectMocks private MileageLogService mileageLogService;
 

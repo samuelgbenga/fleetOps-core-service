@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -22,9 +23,9 @@ class PlateNumberConstraintValidatorTest {
 
     @BeforeEach
     void stubValidPrefix() {
-        when(lgaCodeRepository.existsByCode("KJA")).thenReturn(true);
-        when(lgaCodeRepository.existsByCode("PHC")).thenReturn(true);
-        when(lgaCodeRepository.existsByCode("ABJ")).thenReturn(true);
+        lenient().when(lgaCodeRepository.existsByCode("KJA")).thenReturn(true);
+        lenient().when(lgaCodeRepository.existsByCode("PHC")).thenReturn(true);
+        lenient().when(lgaCodeRepository.existsByCode("ABJ")).thenReturn(true);
     }
 
     // ── valid inputs ─────────────────────────────────────────────────────────
@@ -66,7 +67,7 @@ class PlateNumberConstraintValidatorTest {
             "123-245BX",      // digits in prefix
     })
     void malformedFormat_returnsFalse(String plate) {
-        when(lgaCodeRepository.existsByCode(anyString())).thenReturn(false);
+        lenient().when(lgaCodeRepository.existsByCode(anyString())).thenReturn(false);
         assertThat(validator.isValid(plate, null)).isFalse();
     }
 

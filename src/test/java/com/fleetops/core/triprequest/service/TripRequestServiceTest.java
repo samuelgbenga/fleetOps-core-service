@@ -9,6 +9,7 @@ import com.fleetops.core.kafka.event.MaintenanceFlagCreatedEvent;
 import com.fleetops.core.kafka.event.NotificationRequestEvent;
 import com.fleetops.core.kafka.producer.MaintenanceEventProducer;
 import com.fleetops.core.kafka.producer.NotificationEventProducer;
+import com.fleetops.core.kafka.producer.VehicleActivityProducer;
 import com.fleetops.core.mileage.entity.MileageLog;
 import com.fleetops.core.mileage.repository.MileageLogRepository;
 import com.fleetops.core.triprequest.dto.CompleteTripRequest;
@@ -54,6 +55,7 @@ class TripRequestServiceTest {
     @Mock private NotificationEventProducer notificationEventProducer;
     @Mock private MileageLogRepository mileageLogRepository;
     @Mock private MaintenanceEventProducer maintenanceEventProducer;
+    @Mock private VehicleActivityProducer vehicleActivityProducer;
 
     @InjectMocks private TripRequestService tripRequestService;
 
