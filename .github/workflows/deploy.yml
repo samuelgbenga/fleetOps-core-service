@@ -21,7 +21,7 @@ jobs:
           cache: maven
 
       - name: Run tests
-        run: ./mvnw test -Dspring.profiles.active=dev --no-transfer-progress
+        run: chmod +x mvnw && ./mvnw test -Dspring.profiles.active=dev --no-transfer-progress
 
   build-and-push:
     name: Build & Push Docker Image
