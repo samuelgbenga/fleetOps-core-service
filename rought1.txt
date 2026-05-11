@@ -1,0 +1,61 @@
+# Render Blueprint — fleet-core-service
+# Docs: https://render.com/docs/blueprint-spec
+#
+# Before syncing this blueprint:
+#   1. Replace YOUR_DOCKER_USERNAME with your Docker Hub username.
+#   2. Set the environment variables marked sync: false in the Render dashboard.
+#   3. For Kafka, use Upstash Kafka (free tier) → https://upstash.com
+#      Copy the bootstrap URL into KAFKA_BOOTSTRAP.
+
+services:
+  - type: web
+    name: fleet-core-service
+    env: docker
+    image:
+      url: docker.io/YOUR_DOCKER_USERNAME/fleet-core-service:latest
+    plan: free
+    region: oregon
+    envVars:
+      # ── Database ──────────────────────────────────────────────────────────
+      # DB_URL must use JDBC format: jdbc:postgresql://HOST:PORT/DATABASE
+      # Find these values in Render dashboard → fleet-core-db → Info tab.
+      - key: DB_URL
+        sync: false
+      - key: DB_USERNAME
+        fromDatabase:
+          name: fleet-core-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: fleet-core-db
+          property: password
+
+      # ── JWT ───────────────────────────────────────────────────────────────
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRY_MS
+        value: "86400000"
+
+      # ── Kafka (set in dashboard — use Upstash bootstrap URL) ─────────────
+      - key: KAFKA_BOOTSTRAP
+        sync: false
+
+      # ── Admin seed account ────────────────────────────────────────────────
+      - key: ADMIN_NAME
+        value: System Admin
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+
+      # ── App config ────────────────────────────────────────────────────────
+      - key: DEFAULT_MILESTONE_INTERVAL
+        value: "3000"
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+
+databases:
+  - name: fleet-core-db
+    plan: free
+    databaseName: fleetops_core
+    user: fleetops

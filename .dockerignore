@@ -1,0 +1,7 @@
+.git
+.github
+.idea
+.mvn/wrapper/maven-wrapper.jar
+target/
+*.md
+*.txt
