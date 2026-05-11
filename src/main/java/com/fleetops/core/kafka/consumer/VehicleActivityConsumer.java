@@ -17,7 +17,8 @@ public class VehicleActivityConsumer {
 
     @KafkaListener(
             topics = "${kafka.topics.vehicle-activity}",
-            groupId = "${spring.kafka.consumer.group-id}"
+            groupId = "${spring.kafka.consumer.group-id}",
+            containerFactory = "vehicleActivityListenerContainerFactory"
     )
     public void onEvent(VehicleActivityEvent event) {
         log.info("Recording activity event type={} vehicle={}", event.getEventType(), event.getPlateNumber());

@@ -31,7 +31,8 @@ public class MaintenanceFlagConsumer {
 
     @KafkaListener(
             topics = "${kafka.topics.maintenance-flag-created}",
-            groupId = "${spring.kafka.consumer.group-id}"
+            groupId = "${spring.kafka.consumer.group-id}",
+            containerFactory = "maintenanceListenerContainerFactory"
     )
     public void onEvent(MaintenanceFlagCreatedEvent event) {
         log.info("Received MaintenanceFlagCreatedEvent for vehicleId={}", event.getVehicleId());

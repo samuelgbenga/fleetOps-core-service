@@ -278,3 +278,37 @@ this should contain the urlId from claudinary and the url itself.
 for user it should mapped one to one.
 and for vehicle it should be one to many: one vehicle can have many media
 i should be able to get the user url from the user (unidirectional) same with the vehicle.
+
+
+----------------------
+why are you not returning the profile picture of the user inform of dto.
+why are you returning the full entity.
+i shouldnt be seeing he id of the image i mean the entity id.
+
+
+{
+  "name": "Samuel Gbenga",
+  "email": "samuelgbenga972@gmail.com",
+  "password": "Samjeo12$",
+  "role": "FIELD_STAFF"
+}
+
+{
+  "name": "Samuel Gbenga Snr",
+  "email": "samuelgbengasnr@gmail.com",
+  "password": "Samjeo12$",
+  "role": "FLEET_MANAGER"
+}
+
+{
+  "name": "Samuel Gbenga Whytee",
+  "email": "samuel.maintainance@fleetops.com",
+  "password": "Samjeo12$",
+  "role": "MAINTENANCE_TEAM"
+}
+
+{
+  "make": "Toyota",
+  "model": "Land Cruiser",
+  "plateNumber": "KJA-245BX"
+}
