@@ -59,3 +59,73 @@ databases:
     plan: free
     databaseName: fleetops_core
     user: fleetops
+
+
+
+Host
+ep-jolly-violet-apfr6qus.c-7.us-east-1.aws.neon.tech
+Database
+neondb
+Role
+neondb_owner
+Password
+************
+Pooler host
+ep-jolly-violet-apfr6qus-pooler.c-7.us-east-1.aws.neon.tech
+
+
+postgresql://neondb_owner:npg_2lSqpg7LPbZy@ep-jolly-violet-apfr6qus.c-7.us-east-1.aws.neon.tech/neondb?sslmode=require
+
+
+
+=====================================================================
+
+ Render Blueprint — fleet-core-service
+# Docs: https://render.com/docs/blueprint-spec
+#
+# Before syncing:
+#   1. Replace YOUR_DOCKER_USERNAME with your Docker Hub username.
+#   2. Set KAFKA_BOOTSTRAP, ADMIN_EMAIL, ADMIN_PASSWORD, and CORS_ALLOWED_ORIGINS
+#      in the Render dashboard (marked sync: false below).
+#   3. Kafka: use Upstash (https://upstash.com) free tier — copy the bootstrap URL.
+
+services:
+  - type: web
+    name: fleet-core-service
+    env: docker
+    image:
+      url: docker.io/YOUR_DOCKER_USERNAME/fleetops-core-service:latest
+    plan: free
+    region: oregon
+    envVars:
+      # ── Database (Neon PostgreSQL) ─────────────────────────────────────────
+      - key: DB_URL
+        value: jdbc:postgresql://ep-jolly-violet-apfr6qus-pooler.c-7.us-east-1.aws.neon.tech/neondb?sslmode=require
+      - key: DB_USERNAME
+        value: neondb_owner
+      - key: DB_PASSWORD
+        value: npg_2lSqpg7LPbZy
+
+      # ── JWT ───────────────────────────────────────────────────────────────
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRY_MS
+        value: "86400000"
+
+      # ── Kafka (set in dashboard — use Upstash bootstrap URL) ─────────────
+      - key: KAFKA_BOOTSTRAP
+        sync: false
+
+      # ── Admin seed account ────────────────────────────────────────────────
+      - key: ADMIN_NAME
+        value: System Admin
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+
+      # ── App config ────────────────────────────────────────────────────────
+      - key: DEFAULT_MILESTONE_INTERVAL
+        value: "3000"
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
