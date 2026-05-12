@@ -152,7 +152,7 @@ Hard-sets any user's password without requiring the current one. Use this for ac
 ### `GET /api/admin/users`
 **Role:** `ADMIN`
 
-Returns all users including deactivated ones. Each user object includes an `active` field indicating account status.
+Returns all users including deactivated ones. Each user object includes `active` (account status) and `profileMedia` (`null` if no picture set).
 
 ---
 
@@ -196,7 +196,24 @@ Any authenticated user can view and update their own profile without going throu
 ### `GET /api/users/me`
 **Role:** Any authenticated user
 
-Returns the authenticated user's own profile information.
+Returns the authenticated user's own profile. Includes `profileMedia` if a profile picture has been set (`null` otherwise).
+
+**Sample Response**
+```json
+{
+  "id": 3,
+  "name": "John Adeyemi",
+  "email": "john.adeyemi@fleetops.com",
+  "role": "FIELD_STAFF",
+  "active": true,
+  "profileMedia": {
+    "id": 5,
+    "publicId": "fleetops/users/profile-123",
+    "url": "https://res.cloudinary.com/demo/image/upload/v1/fleetops/users/profile-123.jpg"
+  },
+  "createdAt": "2026-01-15T08:00:00"
+}
+```
 
 ---
 
@@ -298,14 +315,14 @@ KJA-245BX
 ### `GET /api/vehicles`
 **Role:** `FLEET_MANAGER`, `ADMIN`
 
-Returns all vehicles. `serviceHistories` is always an empty list on list responses — use `GET /api/vehicles/{id}` for full history.
+Returns all vehicles. Each vehicle includes its `mediaFiles` array (empty if no photos have been added). `serviceHistories` is always an empty list on list responses — use `GET /api/vehicles/{id}` for full history.
 
 ---
 
 ### `GET /api/vehicles/available`
 **Role:** `FIELD_STAFF`, `FLEET_MANAGER`, `ADMIN`
 
-Returns vehicles with status `AVAILABLE`. Vehicles under maintenance or currently assigned are excluded.
+Returns vehicles with status `AVAILABLE`. Each vehicle includes its `mediaFiles` array. Vehicles under maintenance or currently assigned are excluded.
 
 ---
 
@@ -324,6 +341,13 @@ Returns the vehicle with its full service history (most recent first).
   "currentMileage": 6200.0,
   "milestoneInterval": 6000.0,
   "status": "AVAILABLE",
+  "mediaFiles": [
+    {
+      "id": 1,
+      "publicId": "fleetops/vehicles/v1-front",
+      "url": "https://res.cloudinary.com/demo/image/upload/v1/fleetops/vehicles/v1-front.jpg"
+    }
+  ],
   "serviceHistories": [
     {
       "id": 1,

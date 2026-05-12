@@ -42,10 +42,12 @@ public class VehicleService {
         return VehicleResponse.from(vehicleRepository.save(vehicle));
     }
 
+    @Transactional(readOnly = true)
     public List<VehicleResponse> getAllVehicles() {
         return vehicleRepository.findAll().stream().map(VehicleResponse::from).toList();
     }
 
+    @Transactional(readOnly = true)
     public List<VehicleResponse> getAvailableVehicles() {
         return vehicleRepository.findByStatus(VehicleStatus.AVAILABLE)
                 .stream().map(VehicleResponse::from).toList();

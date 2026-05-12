@@ -64,6 +64,7 @@ public class UserService {
         return UserResponse.from(saved);
     }
 
+    @Transactional(readOnly = true)
     public List<UserResponse> getAllUsers() {
         return userRepository.findAll()
                 .stream()
@@ -71,6 +72,7 @@ public class UserService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public UserResponse getUserById(Long id) {
         return userRepository.findById(id)
                 .map(UserResponse::from)
@@ -87,6 +89,7 @@ public class UserService {
 
     // ── Self-service profile endpoints ────────────────────────────────────────
 
+    @Transactional(readOnly = true)
     public UserResponse getMyProfile() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepository.findByEmail(email)
