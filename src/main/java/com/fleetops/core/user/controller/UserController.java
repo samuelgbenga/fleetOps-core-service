@@ -60,4 +60,9 @@ public class UserController {
         userService.reactivateUser(id);
         return ResponseEntity.noContent().build();
     }
+
+    @GetMapping("/test")
+    public ResponseEntity<String> getTest() {
+        return ResponseEntity.ok("Something Test");
+    }
 }

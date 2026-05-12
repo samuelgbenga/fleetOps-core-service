@@ -324,3 +324,19 @@ i shouldnt be seeing he id of the image i mean the entity id.
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.RENDER_DEPLOY_HOOK_URL }}")
           echo "Render deploy hook response: $STATUS"
           [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || exit 1
+
+
+ Clean. Now the stack is just fleet-core-service + watchtower.
+
+  Run these in order:
+
+  # 1. connect existing Kafka to the compose network
+  docker network connect fleetops-net youthful_euclid --alias kafka
+
+  # 2. start the stack
+  docker-compose up -d
+
+  # 3. watch the logs
+  docker-compose logs -f fleet-core-service
+
+  Once you see Spring Boot finish starting, the pipeline is live. Push a change to main and watch Watchtower redeploy it automatically.
