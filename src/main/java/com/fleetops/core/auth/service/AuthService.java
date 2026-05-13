@@ -5,6 +5,7 @@ import com.fleetops.core.auth.dto.ChangePasswordRequest;
 import com.fleetops.core.auth.dto.LoginRequest;
 import com.fleetops.core.auth.util.JwtUtil;
 import com.fleetops.core.exception.ResourceNotFoundException;
+import com.fleetops.core.media.dto.MediaResponse;
 import com.fleetops.core.user.entity.User;
 import com.fleetops.core.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -36,8 +37,10 @@ public class AuthService {
         String token = jwtUtil.generateToken(user);
         return AuthResponse.builder()
                 .token(token)
+                .name(user.getName())
                 .email(user.getEmail())
                 .role(user.getRole().name())
+                .profileMedia(MediaResponse.from(user.getProfileMedia()))
                 .build();
     }
 

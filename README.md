@@ -60,10 +60,18 @@ Swagger UI (interactive docs): `http://localhost:8080/swagger-ui/index.html`
 ```json
 {
   "token": "eyJhbGciOiJIUzI1NiJ9...",
+  "name": "System Admin",
   "email": "admin@fleetops.com",
-  "role": "ADMIN"
+  "role": "ADMIN",
+  "profileMedia": {
+    "id": 5,
+    "publicId": "fleetops/users/profile-123",
+    "url": "https://res.cloudinary.com/demo/image/upload/v1/fleetops/users/profile-123.jpg"
+  }
 }
 ```
+
+> `profileMedia` is `null` if the user has not set a profile picture.
 
 ---
 
