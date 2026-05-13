@@ -54,7 +54,6 @@ public class UserService {
                         "  Password: %s\n" +
                         "  Role:     %s\n\n" +
                         "⚠ For security, please change your password immediately after your first login:\n" +
-                        "  PATCH /api/auth/change-password\n\n" +
                         "FleetOps System",
                         saved.getName(), saved.getEmail(), request.getPassword(), saved.getRole()))
                 .type("ACCOUNT_CREATED")
