@@ -17,6 +17,7 @@ import com.fleetops.core.user.repository.UserRepository;
 import com.fleetops.core.vehicle.entity.Vehicle;
 import com.fleetops.core.vehicle.enums.VehicleStatus;
 import com.fleetops.core.vehicle.repository.VehicleRepository;
+import com.fleetops.core.vehicle.service.VehicleLifecycleService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -46,6 +47,7 @@ class MileageLogServiceTest {
     @Mock private TripRequestRepository tripRequestRepository;
     @Mock private MaintenanceEventProducer maintenanceEventProducer;
     @Mock private VehicleActivityProducer vehicleActivityProducer;
+    @Mock private VehicleLifecycleService vehicleLifecycleService;
 
     @InjectMocks private MileageLogService mileageLogService;
 
