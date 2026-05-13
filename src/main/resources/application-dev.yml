@@ -5,6 +5,26 @@ spring:
     password: ""
     driver-class-name: org.h2.Driver
 
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: fleet-core-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.fleetops.core.kafka.event"
+
+
+    flyway:
+      enabled: false
+      locations: classpath:db/migration
+      baseline-on-migrate: true
+
+
   jpa:
     hibernate:
       ddl-auto: create-drop

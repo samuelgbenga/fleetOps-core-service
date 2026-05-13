@@ -10,6 +10,7 @@ Generated from product requirements and system design discussions.
 - [User Management](#user-management)
 - [Password Management](#password-management)
 - [Vehicle Management](#vehicle-management)
+- [Vehicle Lifecycle](#us-032--vehicle-lifecycle-tracking)
 - [Trip Requests](#trip-requests)
 - [Mileage Reporting](#mileage-reporting)
 - [Maintenance Management](#maintenance-management)
@@ -163,6 +164,30 @@ Generated from product requirements and system design discussions.
 
 ---
 
+### US-032 — Vehicle lifecycle tracking
+**As a** Fleet Manager or Admin,
+**I want to** see a lifecycle percentage on each vehicle that reflects its cumulative wear across mileage, trips, and maintenance rounds,
+**So that** I can identify vehicles approaching end-of-life and remove them from active service before they become a liability.
+
+**Acceptance Criteria:**
+- Each vehicle exposes `lifecyclePercentage` (0–100) and `markedForSale` (boolean) — visible only to `FLEET_MANAGER` and `ADMIN`
+- Lifecycle is computed using a weighted formula:
+  - **50%** — mileage wear: `currentMileage / maxMileage` (default max 300,000 km)
+  - **25%** — qualified trips: `COMPLETED` trips with a linked mileage log ÷ `maxTrips` (default 500)
+  - **25%** — maintenance rounds: resolved maintenance flags ÷ `maxMaintenanceRounds` (default 30)
+- A **qualified trip** requires a mileage log submitted via `POST /api/mileage-logs` with `tripRequestId` pointing to that trip — unlinked logs do not count
+- `POST /api/mileage-logs` accepts an optional `tripRequestId`; if provided it must belong to the submitting user, reference the same vehicle, and be `COMPLETED` — returns `409` otherwise
+- A background job recalculates lifecycle for **all** vehicles every hour (`@Scheduled(cron = "0 0 * * * *")`)
+- Lifecycle is also recalculated immediately after every mileage log submission
+- When `lifecyclePercentage >= 80`:
+  - Vehicle `status` is set to `OUT_OF_SERVICE`
+  - `markedForSale` is set to `true`
+  - Vehicle is excluded from the available pool and cannot receive new trip requests
+- `maxMileage`, `maxTrips`, and `maxMaintenanceRounds` are stored per vehicle and default to 300,000 / 500 / 30 respectively — allowing per-vehicle customisation
+- DB changes delivered via Flyway migration `V2__vehicle_lifecycle_fields.sql`
+
+---
+
 ### US-008 — Update milestone interval
 **As a** Fleet Manager or Admin,
 **I want to** update the mileage threshold that triggers a maintenance flag for a vehicle,
@@ -312,13 +337,15 @@ Generated from product requirements and system design discussions.
 **So that** the system can track cumulative mileage and trigger maintenance when needed.
 
 **Acceptance Criteria:**
-- `POST /api/mileage-logs` accepts `{ vehicleId, reportedMileage }`
+- `POST /api/mileage-logs` accepts `{ vehicleId, reportedMileage, tripRequestId? }`
 - `reportedMileage` is the **absolute odometer value** — not a per-trip delta
 - The submitting field staff must have a `COMPLETED` trip for that vehicle — returns `409` otherwise
 - Submitted value must be **≥** the vehicle's currently recorded mileage — returns `409` if lower
 - Vehicle's `currentMileage` is set directly to the reported value
+- If `tripRequestId` is provided, it is validated (must match user + vehicle + `COMPLETED`) and linked to the log — enabling this trip to count toward the vehicle's lifecycle calculation (see US-032)
 - Returns an instant `200` response confirming the submission
 - Maintenance flagging and fleet manager notification happen **asynchronously** in the background via Kafka
+- Lifecycle recalculation is triggered synchronously after each submission (see US-032)
 
 ---
 
@@ -641,9 +668,11 @@ Generated from product requirements and system design discussions.
 
 | Entity | Status Values |
 |---|---|
-| Vehicle | `AVAILABLE` · `ASSIGNED` · `MAINTENANCE` |
+| Vehicle | `AVAILABLE` · `ASSIGNED` · `MAINTENANCE` · `OUT_OF_SERVICE` |
 | Trip Request | `PENDING` · `APPROVED` · `REJECTED` · `COMPLETED` |
 | Maintenance Flag | `OPEN` · `ASSIGNED` · `IN_PROGRESS` · `PENDING_APPROVAL` · `RESOLVED` |
+
+> `OUT_OF_SERVICE` is set automatically when a vehicle's `lifecyclePercentage` reaches 80%. It cannot be set manually.
 
 ---
 
@@ -682,3 +711,4 @@ Generated from product requirements and system design discussions.
 | US-029 Vehicle activity log / admin dashboard | ✅ Done |
 | US-030 Self-service profile (view, update name, manage own media) | ✅ Done |
 | US-031 Admin + fleet manager media management (user + vehicle) | ✅ Done |
+| US-032 Vehicle lifecycle tracking + OUT_OF_SERVICE automation | ✅ Done |

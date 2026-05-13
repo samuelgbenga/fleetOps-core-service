@@ -19,6 +19,8 @@ public class VehicleResponse {
     private Double currentMileage;
     private Double milestoneInterval;
     private VehicleStatus status;
+    private Double lifecyclePercentage;
+    private Boolean markedForSale;
     private List<MediaResponse> mediaFiles;
     private List<ServiceHistoryResponse> serviceHistories;
     private LocalDateTime registeredAt;
@@ -32,6 +34,8 @@ public class VehicleResponse {
                 .currentMileage(v.getCurrentMileage())
                 .milestoneInterval(v.getMilestoneInterval())
                 .status(v.getStatus())
+                .lifecyclePercentage(v.getLifecyclePercentage())
+                .markedForSale(v.getMarkedForSale())
                 .mediaFiles(MediaResponse.fromList(v.getMediaFiles()))
                 .serviceHistories(List.of())
                 .registeredAt(v.getRegisteredAt())
@@ -47,6 +51,8 @@ public class VehicleResponse {
                 .currentMileage(v.getCurrentMileage())
                 .milestoneInterval(v.getMilestoneInterval())
                 .status(v.getStatus())
+                .lifecyclePercentage(v.getLifecyclePercentage())
+                .markedForSale(v.getMarkedForSale())
                 .mediaFiles(MediaResponse.fromList(v.getMediaFiles()))
                 .serviceHistories(histories)
                 .registeredAt(v.getRegisteredAt())

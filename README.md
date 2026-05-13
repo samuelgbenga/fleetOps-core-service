@@ -20,6 +20,7 @@ Swagger UI (interactive docs): `http://localhost:8080/swagger-ui/index.html`
 - [User Profile](#user-profile)
 - [Password Management](#password-management)
 - [Vehicles](#vehicles)
+- [Vehicle Lifecycle](#vehicle-lifecycle)
 - [Trip Requests](#trip-requests)
 - [Mileage Logs](#mileage-logs)
 - [Maintenance Flags](#maintenance-flags)
@@ -330,14 +331,14 @@ Returns all vehicles. Each vehicle includes its `mediaFiles` array (empty if no 
 ### `GET /api/vehicles/available`
 **Role:** `FIELD_STAFF`, `FLEET_MANAGER`, `ADMIN`
 
-Returns vehicles with status `AVAILABLE`. Each vehicle includes its `mediaFiles` array. Vehicles under maintenance or currently assigned are excluded.
+Returns vehicles with status `AVAILABLE`. Each vehicle includes its `mediaFiles` array. Vehicles under maintenance, currently assigned, or marked `OUT_OF_SERVICE` are excluded.
 
 ---
 
 ### `GET /api/vehicles/{id}`
 **Role:** `FLEET_MANAGER`, `ADMIN`
 
-Returns the vehicle with its full service history (most recent first).
+Returns the vehicle with its full service history (most recent first). Includes `lifecyclePercentage` and `markedForSale` — only visible to `FLEET_MANAGER` and `ADMIN`.
 
 **Sample Response**
 ```json
@@ -349,6 +350,8 @@ Returns the vehicle with its full service history (most recent first).
   "currentMileage": 6200.0,
   "milestoneInterval": 6000.0,
   "status": "AVAILABLE",
+  "lifecyclePercentage": 34.7,
+  "markedForSale": false,
   "mediaFiles": [
     {
       "id": 1,
@@ -368,6 +371,28 @@ Returns the vehicle with its full service history (most recent first).
   "registeredAt": "2026-01-10T09:00:00"
 }
 ```
+
+> When `lifecyclePercentage` reaches **80%**, the vehicle status is automatically set to `OUT_OF_SERVICE` and `markedForSale` flips to `true`. The vehicle is then excluded from trip requests.
+
+---
+
+### Vehicle Lifecycle
+
+Each vehicle carries a `lifecyclePercentage` (0–100) computed by a background job that runs **every hour**. It is also recalculated immediately after every mileage submission.
+
+**Formula (weighted):**
+
+| Factor | Weight | Source |
+|---|---|---|
+| Mileage wear | 50% | `currentMileage / maxMileage` (default max: 300,000 km) |
+| Qualified trips | 25% | Trips with a linked mileage log ÷ `maxTrips` (default: 500) |
+| Maintenance rounds | 25% | Resolved maintenance flags ÷ `maxMaintenanceRounds` (default: 30) |
+
+> A **qualified trip** is a `COMPLETED` trip request that has a mileage log submitted with `tripRequestId` pointing to it. Unlinked mileage logs do not count toward the trip factor.
+
+**At 80%+:** status → `OUT_OF_SERVICE`, `markedForSale` → `true`. The vehicle is removed from the available pool automatically.
+
+`lifecyclePercentage` and `markedForSale` are visible only on vehicle responses returned to `FLEET_MANAGER` and `ADMIN`.
 
 ---
 
@@ -480,15 +505,27 @@ If the new reading causes the vehicle to cross its configured `milestoneInterval
 ### `POST /api/mileage-logs`
 **Role:** `FIELD_STAFF`
 
-**Sample 1 — Odometer now reads 3,200 km**
+Accepts an optional `tripRequestId` to link this odometer reading to the specific completed trip. Linking trips is required for that trip to count toward the vehicle's lifecycle percentage.
+
+**Sample 1 — Odometer now reads 3,200 km (linked to trip)**
 ```json
 {
   "vehicleId": 2,
-  "reportedMileage": 3200.0
+  "reportedMileage": 3200.0,
+  "tripRequestId": 14
 }
 ```
 
 **Sample 2 — Odometer now reads 5,850 km (crosses 5,000 km milestone)**
+```json
+{
+  "vehicleId": 5,
+  "reportedMileage": 5850.0,
+  "tripRequestId": 22
+}
+```
+
+**Sample 3 — Without trip link (legacy; trip won't count toward lifecycle)**
 ```json
 {
   "vehicleId": 5,
@@ -497,6 +534,7 @@ If the new reading causes the vehicle to cross its configured `milestoneInterval
 ```
 
 > The reported value must be greater than or equal to the vehicle's currently recorded mileage. Submitting a lower value returns `409`.
+> If `tripRequestId` is provided, it must belong to the submitting user, reference the same vehicle, and be in `COMPLETED` status — returns `409` otherwise.
 
 **Response**
 ```json

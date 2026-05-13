@@ -13,4 +13,6 @@ public class MileageLogRequest {
     @NotNull(message = "Reported mileage is required")
     @Positive(message = "Reported mileage must be greater than 0")
     private Double reportedMileage;
+
+    private Long tripRequestId;
 }

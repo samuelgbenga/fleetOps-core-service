@@ -340,3 +340,18 @@ i shouldnt be seeing he id of the image i mean the entity id.
   docker-compose logs -f fleet-core-service
 
   Once you see Spring Boot finish starting, the pipeline is live. Push a change to main and watch Watchtower redeploy it automatically.
+
+
+
+  whatsup i have pushed the code to a live db neon.
+    now i need to add some new entities and make some changes.
+    so first of all implement flyway db using baseline true.
+    when its time for the implemementation we will make uks
+
+
+
+ what we need now is:
+Fleet Readiness check-percentage.
+. Vehicle life cycle. once the vehicle life cycle is at 80% this should indicate out
+of usage and marked for sales.
+vehicle details only visible to the fleet-manager and admin.

@@ -12,4 +12,5 @@ public interface MaintenanceFlagRepository extends JpaRepository<MaintenanceFlag
     List<MaintenanceFlag> findByStatus(FlagStatus status);
     List<MaintenanceFlag> findByVehicleId(Long vehicleId);
     List<MaintenanceFlag> findByAssignedToId(Long userId);
+    long countByVehicleIdAndStatus(Long vehicleId, FlagStatus status);
 }

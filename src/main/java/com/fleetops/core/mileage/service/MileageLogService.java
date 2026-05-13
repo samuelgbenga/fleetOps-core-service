@@ -10,6 +10,7 @@ import com.fleetops.core.mileage.dto.MileageLogRequest;
 import com.fleetops.core.mileage.dto.MileageLogResponse;
 import com.fleetops.core.mileage.entity.MileageLog;
 import com.fleetops.core.mileage.repository.MileageLogRepository;
+import com.fleetops.core.triprequest.entity.TripRequest;
 import com.fleetops.core.triprequest.enums.TripRequestStatus;
 import com.fleetops.core.triprequest.repository.TripRequestRepository;
 import com.fleetops.core.user.entity.User;
@@ -17,6 +18,7 @@ import com.fleetops.core.user.enums.UserRole;
 import com.fleetops.core.user.repository.UserRepository;
 import com.fleetops.core.vehicle.entity.Vehicle;
 import com.fleetops.core.vehicle.repository.VehicleRepository;
+import com.fleetops.core.vehicle.service.VehicleLifecycleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -37,6 +39,7 @@ public class MileageLogService {
     private final TripRequestRepository tripRequestRepository;
     private final MaintenanceEventProducer maintenanceEventProducer;
     private final VehicleActivityProducer vehicleActivityProducer;
+    private final VehicleLifecycleService vehicleLifecycleService;
 
     @Transactional
     public MileageLogResponse submitLog(MileageLogRequest request) {
@@ -47,13 +50,28 @@ public class MileageLogService {
         Vehicle vehicle = vehicleRepository.findById(request.getVehicleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + request.getVehicleId()));
 
-        boolean hasCompletedTrip = tripRequestRepository.existsByFieldStaffIdAndVehicleIdAndStatus(
-                submittedBy.getId(), vehicle.getId(), TripRequestStatus.COMPLETED);
-        if (!hasCompletedTrip) {
-            throw new ConflictException(
-                    "Mileage can only be logged after a completed trip. " +
-                    "No completed trip found for vehicle " + vehicle.getPlateNumber() +
-                    " under your account.");
+        TripRequest linkedTrip = null;
+        if (request.getTripRequestId() != null) {
+            linkedTrip = tripRequestRepository.findById(request.getTripRequestId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Trip request not found: " + request.getTripRequestId()));
+            if (!linkedTrip.getVehicle().getId().equals(vehicle.getId())) {
+                throw new ConflictException("Trip request does not belong to vehicle " + vehicle.getPlateNumber());
+            }
+            if (!linkedTrip.getFieldStaff().getId().equals(submittedBy.getId())) {
+                throw new ConflictException("Trip request does not belong to the submitting user");
+            }
+            if (linkedTrip.getStatus() != TripRequestStatus.COMPLETED) {
+                throw new ConflictException("Mileage can only be logged against a completed trip");
+            }
+        } else {
+            boolean hasCompletedTrip = tripRequestRepository.existsByFieldStaffIdAndVehicleIdAndStatus(
+                    submittedBy.getId(), vehicle.getId(), TripRequestStatus.COMPLETED);
+            if (!hasCompletedTrip) {
+                throw new ConflictException(
+                        "Mileage can only be logged after a completed trip. " +
+                        "No completed trip found for vehicle " + vehicle.getPlateNumber() +
+                        " under your account.");
+            }
         }
 
         Double reportedMileage = request.getReportedMileage();
@@ -73,6 +91,7 @@ public class MileageLogService {
         MileageLog mileageLog = MileageLog.builder()
                 .vehicle(vehicle)
                 .submittedBy(submittedBy)
+                .tripRequest(linkedTrip)
                 .reportedMileage(reportedMileage)
                 .build();
         mileageLogRepository.save(mileageLog);
@@ -93,6 +112,8 @@ public class MileageLogService {
             log.info("Milestone reached for vehicle {}. Publishing maintenance event.", vehicle.getPlateNumber());
             publishMaintenanceEvent(vehicle, reportedMileage);
         }
+
+        vehicleLifecycleService.recalculateForVehicle(vehicle.getId());
 
         return MileageLogResponse.from(mileageLog);
     }

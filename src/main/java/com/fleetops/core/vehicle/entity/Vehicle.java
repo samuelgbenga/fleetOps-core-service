@@ -53,6 +53,26 @@ public class Vehicle {
     @Builder.Default
     private List<Media> mediaFiles = new ArrayList<>();
 
+    @Column(name = "lifecycle_percentage", nullable = false)
+    @Builder.Default
+    private Double lifecyclePercentage = 0.0;
+
+    @Column(name = "max_mileage", nullable = false)
+    @Builder.Default
+    private Double maxMileage = 300000.0;
+
+    @Column(name = "max_trips", nullable = false)
+    @Builder.Default
+    private Integer maxTrips = 500;
+
+    @Column(name = "max_maintenance_rounds", nullable = false)
+    @Builder.Default
+    private Integer maxMaintenanceRounds = 30;
+
+    @Column(name = "marked_for_sale", nullable = false)
+    @Builder.Default
+    private Boolean markedForSale = false;
+
     @Column(name = "registered_at", nullable = false, updatable = false)
     private LocalDateTime registeredAt;
 
