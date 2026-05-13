@@ -15,11 +15,12 @@ public interface VehicleAssignmentRepository extends JpaRepository<VehicleAssign
     List<VehicleAssignment> findByVehicleId(Long vehicleId);
 
     @Query("""
-            SELECT COUNT(a) > 0 FROM VehicleAssignment a
-            WHERE a.vehicle.id = :vehicleId
-            AND a.startDate < :endDate
-            AND a.endDate > :startDate
-            """)
+        SELECT COUNT(a) > 0 FROM VehicleAssignment a
+        WHERE a.vehicle.id = :vehicleId
+        AND a.tripRequest.status = com.fleetops.core.triprequest.enums.TripRequestStatus.APPROVED
+        AND a.startDate < :endDate
+        AND a.endDate > :startDate
+        """)
     boolean existsOverlappingAssignment(
             @Param("vehicleId") Long vehicleId,
             @Param("startDate") LocalDate startDate,
