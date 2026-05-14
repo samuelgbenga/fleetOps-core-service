@@ -87,6 +87,13 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- Dotenv support for loading .env in local/IDE runs -->
+        <dependency>
+            <groupId>me.paulschwarz</groupId>
+            <artifactId>spring-dotenv</artifactId>
+            <version>4.0.0</version>
+        </dependency>
+
         <!-- H2 (local dev profile only) -->
         <dependency>
             <groupId>com.h2database</groupId>

@@ -5,10 +5,12 @@ import com.fleetops.core.activity.repository.VehicleActivityLogRepository;
 import com.fleetops.core.kafka.event.VehicleActivityEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 @Component
+@Profile("!dev")
 @RequiredArgsConstructor
 @Slf4j
 public class VehicleActivityConsumer {

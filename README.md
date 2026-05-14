@@ -9,7 +9,43 @@ All protected endpoints require a Bearer token:
 Authorization: Bearer <token>
 ```
 
-Swagger UI (interactive docs): `http://localhost:8080/swagger-ui/index.html`
+Swagger UI (interactive docs): `http://localhost:8082/swagger-ui/index.html`
+
+Postman collection: [`postman/FleetOps-Core-Service.postman_collection.json`](postman/FleetOps-Core-Service.postman_collection.json)
+
+Architecture & design decisions: [`ARCHITECTURE.md`](ARCHITECTURE.md)
+
+---
+
+## Architecture Overview
+
+```mermaid
+graph TD
+    Client["Client / Frontend"] -->|"JWT-authenticated REST :8082"| API
+
+    subgraph "FleetOps Core Service"
+        API["REST Controllers"]
+        SVC["Service Layer"]
+        SCH["Schedulers\n(lifecycle · cleanup)"]
+        PROD["Kafka Producers"]
+        CONS["Kafka Consumers"]
+        API --> SVC
+        SVC --> PROD
+        SCH --> SVC
+    end
+
+    SVC -->|"JPA + Flyway"| DB[(PostgreSQL)]
+
+    PROD -->|"maintenance.flag.created"| K1[Kafka]
+    PROD -->|"fleet.activity"| K1
+    PROD -->|"notification.request"| K1
+
+    K1 -->|MaintenanceFlagConsumer| CONS
+    K1 -->|VehicleActivityConsumer| CONS
+    CONS --> SVC
+
+    K1 -->|consumed externally| NS["Notification Service\n(email delivery)"]
+```
 
 ---
 
