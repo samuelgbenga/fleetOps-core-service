@@ -67,8 +67,8 @@ public class CompanyServiceImpl implements CompanyService {
                 .build());
 
         notificationEventProducer.publish(NotificationRequestEvent.builder()
-                .recipientEmail(request.getEmail())
-                .recipientName(request.getName())
+                .recipientEmail(request.getAdminEmail())
+                .recipientName(request.getAdminName())
                 .subject("Company Registration Received")
                 .message("Your registration for " + request.getName() + " is pending review.")
                 .type("COMPANY_REGISTERED")
@@ -134,14 +134,16 @@ public class CompanyServiceImpl implements CompanyService {
             userRepository.save(u);
         });
 
-        notificationEventProducer.publish(NotificationRequestEvent.builder()
-                .recipientEmail(company.getEmail())
-                .recipientName(company.getName())
-                .subject("Company Approved!")
-                .message("Congratulations! " + company.getName() + " has been approved on FleetOps.")
-                .type("COMPANY_APPROVED")
-                .occurredAt(LocalDateTime.now())
-                .build());
+        userRepository.findByCompanyIdAndRole(id, Role.COMPANY_ADMIN).ifPresent(admin ->
+                notificationEventProducer.publish(NotificationRequestEvent.builder()
+                        .recipientEmail(admin.getEmail())
+                        .recipientName(admin.getName())
+                        .subject("Company Approved!")
+                        .message("Congratulations! " + company.getName() + " has been approved on FleetOps.")
+                        .type("COMPANY_APPROVED")
+                        .occurredAt(LocalDateTime.now())
+                        .build())
+        );
 
         return CompanyResponse.from(company);
     }
@@ -154,14 +156,16 @@ public class CompanyServiceImpl implements CompanyService {
         company.setRejectionReason(request.getReason());
         companyRepository.save(company);
 
-        notificationEventProducer.publish(NotificationRequestEvent.builder()
-                .recipientEmail(company.getEmail())
-                .recipientName(company.getName())
-                .subject("Company Registration Rejected")
-                .message("Unfortunately, " + company.getName() + " was rejected. Reason: " + request.getReason())
-                .type("COMPANY_REJECTED")
-                .occurredAt(LocalDateTime.now())
-                .build());
+        userRepository.findByCompanyIdAndRole(id, Role.COMPANY_ADMIN).ifPresent(admin ->
+                notificationEventProducer.publish(NotificationRequestEvent.builder()
+                        .recipientEmail(admin.getEmail())
+                        .recipientName(admin.getName())
+                        .subject("Company Registration Rejected")
+                        .message("Unfortunately, " + company.getName() + " was rejected. Reason: " + request.getReason())
+                        .type("COMPANY_REJECTED")
+                        .occurredAt(LocalDateTime.now())
+                        .build())
+        );
 
         return CompanyResponse.from(company);
     }
@@ -171,7 +175,20 @@ public class CompanyServiceImpl implements CompanyService {
     public CompanyResponse suspendCompany(Long id) {
         Company company = getOrThrow(id);
         company.setStatus(CompanyStatus.SUSPENDED);
-        return CompanyResponse.from(companyRepository.save(company));
+        companyRepository.save(company);
+
+        userRepository.findByCompanyIdAndRole(id, Role.COMPANY_ADMIN).ifPresent(admin ->
+                notificationEventProducer.publish(NotificationRequestEvent.builder()
+                        .recipientEmail(admin.getEmail())
+                        .recipientName(admin.getName())
+                        .subject("Company Account Suspended")
+                        .message("Your company " + company.getName() + " has been suspended on FleetOps. Please contact support for more information.")
+                        .type("COMPANY_SUSPENDED")
+                        .occurredAt(LocalDateTime.now())
+                        .build())
+        );
+
+        return CompanyResponse.from(company);
     }
 
     @Override
@@ -179,7 +196,20 @@ public class CompanyServiceImpl implements CompanyService {
     public CompanyResponse reactivateCompany(Long id) {
         Company company = getOrThrow(id);
         company.setStatus(CompanyStatus.APPROVED);
-        return CompanyResponse.from(companyRepository.save(company));
+        companyRepository.save(company);
+
+        userRepository.findByCompanyIdAndRole(id, Role.COMPANY_ADMIN).ifPresent(admin ->
+                notificationEventProducer.publish(NotificationRequestEvent.builder()
+                        .recipientEmail(admin.getEmail())
+                        .recipientName(admin.getName())
+                        .subject("Company Account Reactivated")
+                        .message("Good news! Your company " + company.getName() + " has been reactivated on FleetOps.")
+                        .type("COMPANY_REACTIVATED")
+                        .occurredAt(LocalDateTime.now())
+                        .build())
+        );
+
+        return CompanyResponse.from(company);
     }
 
     private Company getOrThrow(Long id) {
