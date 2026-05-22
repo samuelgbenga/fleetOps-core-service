@@ -61,6 +61,8 @@ application-prod.properties
 out/
 bin/
 
+Prompt.md
+
 # =========================
 # VS Code (if used)
 # =========================
