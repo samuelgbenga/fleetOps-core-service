@@ -783,9 +783,11 @@ class CompanyServiceImplTest {
     @Test
     void approveCompany_sendsNotification() {
         Company c = company(1L, "Corp", CompanyStatus.PENDING);
+        User admin = makeUser(10L, Role.COMPANY_ADMIN, c, false);
         when(companyRepository.findById(1L)).thenReturn(Optional.of(c));
         when(companyRepository.save(any())).thenReturn(c);
         when(userRepository.findByCompanyId(1L)).thenReturn(List.of());
+        when(userRepository.findByCompanyIdAndRole(1L, Role.COMPANY_ADMIN)).thenReturn(Optional.of(admin));
 
         companyService.approveCompany(1L);
 
@@ -845,26 +847,30 @@ class CompanyServiceImplTest {
     }
 
     @Test
-    void approveCompany_notificationContainsCompanyEmail() {
+    void approveCompany_notificationSentToAdminEmail() {
         Company c = company(1L, "Corp", CompanyStatus.PENDING);
         c.setEmail("corp@test.com");
+        User admin = makeUser(10L, Role.COMPANY_ADMIN, c, false);
         when(companyRepository.findById(1L)).thenReturn(Optional.of(c));
         when(companyRepository.save(any())).thenReturn(c);
         when(userRepository.findByCompanyId(1L)).thenReturn(List.of());
+        when(userRepository.findByCompanyIdAndRole(1L, Role.COMPANY_ADMIN)).thenReturn(Optional.of(admin));
 
         companyService.approveCompany(1L);
 
         var captor = ArgumentCaptor.forClass(com.fleetops.core.module.kafka.event.NotificationRequestEvent.class);
         verify(notificationEventProducer).publish(captor.capture());
-        assertThat(captor.getValue().getRecipientEmail()).isEqualTo("corp@test.com");
+        assertThat(captor.getValue().getRecipientEmail()).isEqualTo("user10@test.com");
     }
 
     @Test
     void approveCompany_notificationTypeIsApproved() {
         Company c = company(1L, "Corp", CompanyStatus.PENDING);
+        User admin = makeUser(10L, Role.COMPANY_ADMIN, c, false);
         when(companyRepository.findById(1L)).thenReturn(Optional.of(c));
         when(companyRepository.save(any())).thenReturn(c);
         when(userRepository.findByCompanyId(1L)).thenReturn(List.of());
+        when(userRepository.findByCompanyIdAndRole(1L, Role.COMPANY_ADMIN)).thenReturn(Optional.of(admin));
 
         companyService.approveCompany(1L);
 
@@ -945,8 +951,10 @@ class CompanyServiceImplTest {
     @Test
     void rejectCompany_sendsNotification() {
         Company c = company(1L, "Corp", CompanyStatus.PENDING);
+        User admin = makeUser(10L, Role.COMPANY_ADMIN, c, false);
         when(companyRepository.findById(1L)).thenReturn(Optional.of(c));
         when(companyRepository.save(any())).thenReturn(c);
+        when(userRepository.findByCompanyIdAndRole(1L, Role.COMPANY_ADMIN)).thenReturn(Optional.of(admin));
 
         companyService.rejectCompany(1L, rejectionRequest("Reason"));
 
@@ -983,8 +991,10 @@ class CompanyServiceImplTest {
     @Test
     void rejectCompany_notificationTypeIsRejected() {
         Company c = company(1L, "Corp", CompanyStatus.PENDING);
+        User admin = makeUser(10L, Role.COMPANY_ADMIN, c, false);
         when(companyRepository.findById(1L)).thenReturn(Optional.of(c));
         when(companyRepository.save(any())).thenReturn(c);
+        when(userRepository.findByCompanyIdAndRole(1L, Role.COMPANY_ADMIN)).thenReturn(Optional.of(admin));
 
         companyService.rejectCompany(1L, rejectionRequest("reason"));
 
@@ -1018,8 +1028,10 @@ class CompanyServiceImplTest {
     @Test
     void rejectCompany_rejectionReasonInNotification() {
         Company c = company(1L, "Corp", CompanyStatus.PENDING);
+        User admin = makeUser(10L, Role.COMPANY_ADMIN, c, false);
         when(companyRepository.findById(1L)).thenReturn(Optional.of(c));
         when(companyRepository.save(any())).thenReturn(c);
+        when(userRepository.findByCompanyIdAndRole(1L, Role.COMPANY_ADMIN)).thenReturn(Optional.of(admin));
 
         companyService.rejectCompany(1L, rejectionRequest("Fraudulent activity"));
 
@@ -1065,17 +1077,19 @@ class CompanyServiceImplTest {
     }
 
     @Test
-    void rejectCompany_notificationSentToCompanyEmail() {
+    void rejectCompany_notificationSentToAdminEmail() {
         Company c = company(1L, "Corp", CompanyStatus.PENDING);
         c.setEmail("corp@acme.com");
+        User admin = makeUser(10L, Role.COMPANY_ADMIN, c, false);
         when(companyRepository.findById(1L)).thenReturn(Optional.of(c));
         when(companyRepository.save(any())).thenReturn(c);
+        when(userRepository.findByCompanyIdAndRole(1L, Role.COMPANY_ADMIN)).thenReturn(Optional.of(admin));
 
         companyService.rejectCompany(1L, rejectionRequest("reason"));
 
         var captor = ArgumentCaptor.forClass(com.fleetops.core.module.kafka.event.NotificationRequestEvent.class);
         verify(notificationEventProducer).publish(captor.capture());
-        assertThat(captor.getValue().getRecipientEmail()).isEqualTo("corp@acme.com");
+        assertThat(captor.getValue().getRecipientEmail()).isEqualTo("user10@test.com");
     }
 
     // ═══════════════════════════════════════════════
@@ -1124,25 +1138,29 @@ class CompanyServiceImplTest {
     }
 
     @Test
-    void suspendCompany_noNotificationSent() {
+    void suspendCompany_sendsNotification() {
         Company c = company(1L, "Corp", CompanyStatus.APPROVED);
+        User admin = makeUser(10L, Role.COMPANY_ADMIN, c, true);
         when(companyRepository.findById(1L)).thenReturn(Optional.of(c));
         when(companyRepository.save(any())).thenReturn(c);
+        when(userRepository.findByCompanyIdAndRole(1L, Role.COMPANY_ADMIN)).thenReturn(Optional.of(admin));
 
         companyService.suspendCompany(1L);
 
-        verifyNoInteractions(notificationEventProducer);
+        verify(notificationEventProducer, times(1)).publish(any());
     }
 
     @Test
-    void suspendCompany_noUserRepositoryInteraction() {
+    void suspendCompany_doesNotModifyUsers() {
         Company c = company(1L, "Corp", CompanyStatus.APPROVED);
+        User admin = makeUser(10L, Role.COMPANY_ADMIN, c, true);
         when(companyRepository.findById(1L)).thenReturn(Optional.of(c));
         when(companyRepository.save(any())).thenReturn(c);
+        when(userRepository.findByCompanyIdAndRole(1L, Role.COMPANY_ADMIN)).thenReturn(Optional.of(admin));
 
         companyService.suspendCompany(1L);
 
-        verifyNoInteractions(userRepository);
+        verify(userRepository, never()).save(any());
     }
 
     @Test
@@ -1265,25 +1283,29 @@ class CompanyServiceImplTest {
     }
 
     @Test
-    void reactivateCompany_noNotificationSent() {
+    void reactivateCompany_sendsNotification() {
         Company c = company(1L, "Corp", CompanyStatus.SUSPENDED);
+        User admin = makeUser(10L, Role.COMPANY_ADMIN, c, true);
         when(companyRepository.findById(1L)).thenReturn(Optional.of(c));
         when(companyRepository.save(any())).thenReturn(c);
+        when(userRepository.findByCompanyIdAndRole(1L, Role.COMPANY_ADMIN)).thenReturn(Optional.of(admin));
 
         companyService.reactivateCompany(1L);
 
-        verifyNoInteractions(notificationEventProducer);
+        verify(notificationEventProducer, times(1)).publish(any());
     }
 
     @Test
-    void reactivateCompany_noUserRepositoryInteraction() {
+    void reactivateCompany_doesNotModifyUsers() {
         Company c = company(1L, "Corp", CompanyStatus.SUSPENDED);
+        User admin = makeUser(10L, Role.COMPANY_ADMIN, c, true);
         when(companyRepository.findById(1L)).thenReturn(Optional.of(c));
         when(companyRepository.save(any())).thenReturn(c);
+        when(userRepository.findByCompanyIdAndRole(1L, Role.COMPANY_ADMIN)).thenReturn(Optional.of(admin));
 
         companyService.reactivateCompany(1L);
 
-        verifyNoInteractions(userRepository);
+        verify(userRepository, never()).save(any());
     }
 
     @Test
