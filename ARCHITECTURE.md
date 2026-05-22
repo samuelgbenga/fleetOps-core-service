@@ -25,7 +25,7 @@ graph TD
 
     SVC -->|JPA + Flyway| DB[(PostgreSQL)]
 
-    PROD -->|"maintenance.flag.created"| K1[Kafka]
+    PROD -->|"maintenance.events"| K1[Kafka]
     PROD -->|"fleet.activity"| K1
     PROD -->|"notification.request"| K1
 
@@ -44,18 +44,19 @@ graph TD
 |---|---|
 | `auth` | JWT login, password change, Spring Security stateless filter chain |
 | `user` | User CRUD, activation/deactivation, role-based access |
-| `vehicle` | Vehicle registration, status management, service history, lifecycle scoring |
-| `triprequest` | Trip request lifecycle: `PENDING → APPROVED → COMPLETED / REJECTED` |
+| `vehicle` | Vehicle registration, status management, service history, lifecycle scoring, vehicle image upload |
+| `triprequest` | Trip request lifecycle: `PENDING → APPROVED → COMPLETED / REJECTED`; `VehicleAssignment` records live here |
 | `mileage` | Odometer readings, milestone crossing detection, maintenance trigger |
-| `maintenance` | Flag lifecycle: `OPEN → ASSIGNED → IN_PROGRESS → PENDING_APPROVAL → RESOLVED` |
-| `assignment` | Vehicle assignment records created when a trip is approved |
+| `maintenance` | Flag lifecycle: `OPEN → CREW_ASSIGNED → QUOTE_SUBMITTED → QUOTE_APPROVED / QUOTE_REJECTED → IN_PROGRESS → PENDING_APPROVAL → RESOLVED` |
+| `breakdown` | Breakdown reporting, crew dispatch, replacement vehicle dispatch, resolution tracking |
 | `activity` | Immutable vehicle event log consumed from Kafka, exposed via dashboard API |
-| `media` | Cloudinary media record management for vehicles and user profiles |
-| `admin` | Fleet utilisation reports and vehicle health summaries |
+| `media` | Cloudinary media record management for user profile images |
+| `admin` | Fleet utilisation reports, vehicle health summaries, platform-wide dashboard |
 | `kafka` | Producers (`MaintenanceEventProducer`, `NotificationEventProducer`, `VehicleActivityProducer`) and consumers (`MaintenanceFlagConsumer`, `VehicleActivityConsumer`) |
-| `config` | Security, Swagger/OpenAPI, Kafka, data seeding |
-| `exception` | `GlobalExceptionHandler` — maps all domain exceptions to structured HTTP error responses |
-| `validation` | Custom Bean Validation constraints: `@ValidPlateNumber`, `@ValidPassword` |
+| `shared/config` | Security, Swagger/OpenAPI, Kafka, data seeding |
+| `shared/exception` | `GlobalExceptionHandler` — maps all domain exceptions to structured HTTP error responses |
+| `shared/validation` | Custom Bean Validation constraints: `@ValidPlateNumber`, `@ValidPassword` |
+| `shared/context` | `TenantContext` (ThreadLocal multi-tenancy), `TenantFilter`, `TenantAspect` |
 
 ---
 
@@ -68,7 +69,7 @@ FIELD_STAFF  →  POST /api/mileage-logs
     └─ MileageLogService updates vehicle.currentMileage
     └─ if currentMileage >= milestoneInterval:
          └─ MaintenanceEventProducer publishes MaintenanceFlagCreatedEvent
-              topic: maintenance.flag.created
+              topic: maintenance.events
               └─ MaintenanceFlagConsumer (async):
                    ├─ Sets vehicle.status = MAINTENANCE
                    ├─ Creates MaintenanceFlag (status = OPEN)
@@ -95,16 +96,31 @@ FIELD_STAFF    →  PATCH /api/trip-requests/{id}/complete
     └─ Optional: inline mileage submission triggers milestone check
 ```
 
-### Vehicle Lifecycle Scoring (hourly scheduler)
+### Vehicle Health & Lifecycle Scoring (hourly scheduler)
 
 ```
 VehicleLifecycleService (@Scheduled every hour)
-    └─ For each vehicle:
+    └─ For each vehicle, two separate computations run:
+
+    ── Health Score (0–100) ───────────────────────────────────────────
+         wearIndex = (mileageWear   × 25)   mileage consumed vs max
+                   + (maintFreq    × 20)   resolved flags vs max rounds
+                   + (costRatio    × 15)   maintenance spend vs purchase price
+                   + (tripIntensity× 15)   qualified trips vs max trips
+                   + (breakdownRate× 15)   breakdown count (capped at 5)
+                   + (ageRatio     × 10)   vehicle age vs 15-year ceiling
+         healthScore = 100 − wearIndex
+         healthGrade = EXCELLENT (≥86) | GOOD (≥71) | FAIR (≥51) | POOR (≥31) | CRITICAL (<31)
+
+    ── Lifecycle Percentage ───────────────────────────────────────────
          lifecyclePercentage = (mileageFactor × 0.50)
-                             + (tripFactor     × 0.25)
-                             + (maintFactor    × 0.25)
+                             + (tripFactor    × 0.25)
+                             + (maintFactor   × 0.25)
+                             capped at 100%
+
+    ── Retirement ─────────────────────────────────────────────────────
          if lifecyclePercentage >= 80%:
-             vehicle.status      = OUT_OF_SERVICE
+             vehicle.status       = OUT_OF_SERVICE
              vehicle.markedForSale = true
 ```
 
@@ -155,4 +171,4 @@ The 774 LGA codes are seeded from `nigeria_plate_codes.csv` at startup. Validati
 | `ADMIN_EMAIL` | `admin@fleetops.com` | Email of the seeded admin account |
 | `ADMIN_PASSWORD` | *(required in production — no default)* | Password of the seeded admin account |
 | `DEFAULT_MILESTONE_INTERVAL` | `3000` | Default vehicle maintenance threshold (km) |
-| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | Comma-separated allowed CORS origins |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | Allowed CORS origin — update `SecurityConfig.corsConfigurationSource()` to inject this before deploying a production frontend |
