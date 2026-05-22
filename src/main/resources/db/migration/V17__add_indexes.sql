@@ -1,0 +1,12 @@
+CREATE INDEX idx_vehicles_company_id ON vehicles(company_id);
+CREATE INDEX idx_vehicles_status ON vehicles(status);
+CREATE INDEX idx_trip_requests_company_id ON trip_requests(company_id);
+CREATE INDEX idx_trip_requests_status ON trip_requests(status);
+CREATE INDEX idx_maintenance_flags_company_id ON maintenance_flags(company_id);
+CREATE INDEX idx_maintenance_flags_status ON maintenance_flags(status);
+CREATE INDEX idx_activity_logs_plate_number ON vehicle_activity_logs(plate_number);
+CREATE INDEX idx_activity_logs_occurred_at ON vehicle_activity_logs(occurred_at);
+CREATE INDEX idx_activity_logs_company_id ON vehicle_activity_logs(company_id);
+CREATE INDEX idx_outbox_events_status ON outbox_events(status);
+CREATE INDEX idx_breakdown_reports_company_id ON breakdown_reports(company_id);
+CREATE INDEX idx_users_company_id ON users(company_id);

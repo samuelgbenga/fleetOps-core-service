@@ -1,0 +1,458 @@
+{
+  "info": {
+    "name": "FleetOps Core Service",
+    "description": "REST API collection for the FleetOps Core Domain Service. Set the {{baseUrl}} variable to http://localhost:8082 and {{token}} to the JWT returned from POST /api/auth/login.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8082" },
+    { "key": "token",   "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@fleetops.com\",\n  \"password\": \"Admin@1234\"\n}" }
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/auth/change-password",
+            "body": { "mode": "raw", "raw": "{\n  \"currentPassword\": \"Admin@1234\",\n  \"newPassword\": \"Admin@5678\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/admin/users",
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"John Adeyemi\",\n  \"email\": \"john.adeyemi@fleetops.com\",\n  \"password\": \"Staff@1234\",\n  \"role\": \"FIELD_STAFF\"\n}" }
+          }
+        },
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/admin/users"
+          }
+        },
+        {
+          "name": "Get User by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/admin/users/1"
+          }
+        },
+        {
+          "name": "Deactivate User",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/admin/users/1/deactivate"
+          }
+        },
+        {
+          "name": "Reactivate User",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/admin/users/1/reactivate"
+          }
+        },
+        {
+          "name": "Reset Password (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/admin/users/1/reset-password",
+            "body": { "mode": "raw", "raw": "{\n  \"newPassword\": \"Reset@1234\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "User Profile",
+      "item": [
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/users/me"
+          }
+        },
+        {
+          "name": "Update My Name",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/users/me",
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"John Adeyemi Jr.\"\n}" }
+          }
+        },
+        {
+          "name": "Set Profile Picture",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/users/me/media",
+            "body": { "mode": "raw", "raw": "{\n  \"publicId\": \"fleetops/users/profile-123\",\n  \"url\": \"https://res.cloudinary.com/demo/image/upload/v1/fleetops/users/profile-123.jpg\"\n}" }
+          }
+        },
+        {
+          "name": "Remove Profile Picture",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/users/me/media"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Vehicles",
+      "item": [
+        {
+          "name": "Register Vehicle",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/vehicles",
+            "body": { "mode": "raw", "raw": "{\n  \"make\": \"Toyota\",\n  \"model\": \"Land Cruiser\",\n  \"plateNumber\": \"KJA-245BX\"\n}" }
+          }
+        },
+        {
+          "name": "Get All Vehicles",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/vehicles"
+          }
+        },
+        {
+          "name": "Get Available Vehicles",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/vehicles/available"
+          }
+        },
+        {
+          "name": "Get Vehicle by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/vehicles/1"
+          }
+        },
+        {
+          "name": "Update Milestone Interval",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/vehicles/1/milestone-interval",
+            "body": { "mode": "raw", "raw": "{\n  \"milestoneInterval\": 5000\n}" }
+          }
+        },
+        {
+          "name": "Add Vehicle Photos",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/vehicles/1/media",
+            "body": { "mode": "raw", "raw": "[\n  {\n    \"publicId\": \"fleetops/vehicles/v1-front\",\n    \"url\": \"https://res.cloudinary.com/demo/image/upload/v1/fleetops/vehicles/v1-front.jpg\"\n  }\n]" }
+          }
+        },
+        {
+          "name": "Delete Vehicle Photo",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/vehicles/1/media/1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Trip Requests",
+      "item": [
+        {
+          "name": "Submit Trip Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/trip-requests",
+            "body": { "mode": "raw", "raw": "{\n  \"vehicleId\": 1,\n  \"destination\": \"Lagos Island\",\n  \"startDate\": \"2026-07-10\",\n  \"endDate\": \"2026-07-12\"\n}" }
+          }
+        },
+        {
+          "name": "Get Pending Requests (Fleet Manager)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/trip-requests"
+          }
+        },
+        {
+          "name": "Get All Requests",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/trip-requests/all"
+          }
+        },
+        {
+          "name": "Get My Requests",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/trip-requests/my"
+          }
+        },
+        {
+          "name": "Get My Approved Trips",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/trip-requests/my/approved"
+          }
+        },
+        {
+          "name": "Approve Trip",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/trip-requests/1/approve"
+          }
+        },
+        {
+          "name": "Reject Trip",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/trip-requests/1/reject"
+          }
+        },
+        {
+          "name": "Complete Trip (with mileage)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/trip-requests/1/complete",
+            "body": { "mode": "raw", "raw": "{\n  \"reportedMileage\": 4350.0\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Mileage Logs",
+      "item": [
+        {
+          "name": "Submit Mileage Log",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/mileage-logs",
+            "body": { "mode": "raw", "raw": "{\n  \"vehicleId\": 1,\n  \"reportedMileage\": 3200.0,\n  \"tripRequestId\": 1\n}" }
+          }
+        },
+        {
+          "name": "Get Mileage Logs for Vehicle",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/mileage-logs/vehicle/1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Maintenance Flags",
+      "item": [
+        {
+          "name": "Get All Flags",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/maintenance-flags"
+          }
+        },
+        {
+          "name": "Get My Assigned Flags",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/maintenance-flags/my"
+          }
+        },
+        {
+          "name": "Assign Flag",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/maintenance-flags/1/assign",
+            "body": { "mode": "raw", "raw": "{\n  \"maintenanceTeamUserId\": 4\n}" }
+          }
+        },
+        {
+          "name": "Update Progress",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/maintenance-flags/1/progress",
+            "body": { "mode": "raw", "raw": "{\n  \"progressNotes\": \"Engine oil replaced. Awaiting brake pad delivery.\"\n}" }
+          }
+        },
+        {
+          "name": "Mark Work Done",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/maintenance-flags/1/done"
+          }
+        },
+        {
+          "name": "Approve Maintenance",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/maintenance-flags/1/approve",
+            "body": { "mode": "raw", "raw": "{\n  \"newMilestoneInterval\": 6000,\n  \"serviceNotes\": \"Engine oil, oil filter, and air filter replaced.\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Maintenance Chat",
+      "item": [
+        {
+          "name": "Send Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/maintenance-flags/1/messages",
+            "body": { "mode": "raw", "raw": "{\n  \"message\": \"Brake pads have arrived. Starting installation now.\"\n}" }
+          }
+        },
+        {
+          "name": "Get Messages",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/maintenance-flags/1/messages"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Vehicle Assignments",
+      "item": [
+        {
+          "name": "Get Assignment History for Vehicle",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/assignments/vehicle/1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin Reports",
+      "item": [
+        {
+          "name": "Fleet Utilisation Report",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/admin/reports/utilisation"
+          }
+        },
+        {
+          "name": "Vehicle Health Report",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/admin/reports/vehicle-health"
+          }
+        },
+        {
+          "name": "Activity Logs",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/activity-logs?plateNumber=KJA-245BX&date=2026-05-10",
+              "query": [
+                { "key": "plateNumber", "value": "KJA-245BX" },
+                { "key": "date",        "value": "2026-05-10" }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

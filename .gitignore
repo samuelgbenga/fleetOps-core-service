@@ -6,6 +6,7 @@
 *.ipr
 *.iws
 
+
 # =========================
 # Maven
 # =========================
@@ -51,6 +52,8 @@ application-prod.properties
 # Spring Boot
 # =========================
 *.class
+.claude
+.claude/
 
 # =========================
 # Generated Files
