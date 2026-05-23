@@ -1,13 +1,14 @@
 package com.fleetops.core.module.maintenance.dto;
 
 import com.fleetops.core.module.maintenance.model.MaintenanceFlag;
+import com.fleetops.core.module.maintenance.model.MaintenanceQuotation;
 import lombok.Builder;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
 
 @Getter
-@Builder
+@Builder(toBuilder = true)
 public class MaintenanceFlagResponse {
     private Long id;
     private Long companyId;
@@ -22,6 +23,7 @@ public class MaintenanceFlagResponse {
     private LocalDateTime openedAt;
     private LocalDateTime assignedAt;
     private LocalDateTime resolvedAt;
+    private QuotationResponse latestQuotation;
 
     public static MaintenanceFlagResponse from(MaintenanceFlag f) {
         return MaintenanceFlagResponse.builder()
@@ -38,6 +40,12 @@ public class MaintenanceFlagResponse {
                 .openedAt(f.getOpenedAt())
                 .assignedAt(f.getAssignedAt())
                 .resolvedAt(f.getResolvedAt())
+                .build();
+    }
+
+    public static MaintenanceFlagResponse from(MaintenanceFlag f, MaintenanceQuotation latestQuotation) {
+        return from(f).toBuilder()
+                .latestQuotation(latestQuotation != null ? QuotationResponse.from(latestQuotation) : null)
                 .build();
     }
 }

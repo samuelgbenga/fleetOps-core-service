@@ -27,6 +27,7 @@ public class BreakdownResponse {
     private String assignedCrewName;
     private Long replacementVehicleId;
     private String replacementVehiclePlate;
+    private Long replacementTripRequestId;
     private Long maintenanceFlagId;
     private LocalDateTime reportedAt;
     private LocalDateTime resolvedAt;
@@ -49,6 +50,7 @@ public class BreakdownResponse {
                 .assignedCrewName(r.getAssignedCrew() != null ? r.getAssignedCrew().getName() : null)
                 .replacementVehicleId(r.getReplacementVehicle() != null ? r.getReplacementVehicle().getId() : null)
                 .replacementVehiclePlate(r.getReplacementVehicle() != null ? r.getReplacementVehicle().getPlateNumber() : null)
+                .replacementTripRequestId(r.getReplacementTripRequest() != null ? r.getReplacementTripRequest().getId() : null)
                 .maintenanceFlagId(r.getMaintenanceFlag() != null ? r.getMaintenanceFlag().getId() : null)
                 .reportedAt(r.getReportedAt())
                 .resolvedAt(r.getResolvedAt())

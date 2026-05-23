@@ -61,6 +61,13 @@ public class CompanyUserController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/api/company/crew/available")
+    @PreAuthorize("hasAnyRole('COMPANY_ADMIN', 'FLEET_MANAGER')")
+    @Operation(summary = "List available maintenance crew members")
+    public ResponseEntity<List<UserResponse>> getAvailableCrew() {
+        return ResponseEntity.ok(userService.getAvailableCrew());
+    }
+
     @PatchMapping("/api/company/users/{id}/reset-password")
     @Operation(summary = "Reset a user's password")
     public ResponseEntity<Void> resetPassword(@PathVariable Long id,

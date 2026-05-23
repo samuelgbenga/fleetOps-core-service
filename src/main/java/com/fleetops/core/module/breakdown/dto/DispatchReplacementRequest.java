@@ -8,4 +8,7 @@ public class DispatchReplacementRequest {
 
     @NotNull(message = "Replacement vehicle ID is required")
     private Long replacementVehicleId;
+
+    @NotNull(message = "Staff ID is required")
+    private Long staffId;
 }

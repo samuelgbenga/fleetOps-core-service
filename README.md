@@ -2,7 +2,7 @@
 
 Core domain service for FleetOps. Manages vehicles, users, trip requests, mileage logs, and maintenance flags.
 
-Base URL: `http://localhost:8080`
+Base URL: `http://localhost:8082`
 
 All protected endpoints require a Bearer token:
 ```

@@ -65,6 +65,10 @@ public class BreakdownReport {
     private Vehicle replacementVehicle;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "replacement_trip_request_id")
+    private TripRequest replacementTripRequest;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "maintenance_flag_id")
     private MaintenanceFlag maintenanceFlag;
 

@@ -87,7 +87,9 @@ public class MaintenanceFlagServiceImpl implements MaintenanceFlagService {
 
     @Override
     public MaintenanceFlagResponse getById(Long id) {
-        return MaintenanceFlagResponse.from(getOrThrow(id));
+        MaintenanceFlag flag = getOrThrow(id);
+        var latestQuotation = quotationRepository.findTopByFlagIdOrderByRevisionNumberDesc(flag.getId()).orElse(null);
+        return MaintenanceFlagResponse.from(flag, latestQuotation);
     }
 
     @Override
@@ -111,9 +113,7 @@ public class MaintenanceFlagServiceImpl implements MaintenanceFlagService {
             throw new ConflictException("Flag must be OPEN to assign crew");
         }
         User crew = userRepository.findById(request.getCrewId())
-                .filter(u -> u.getRole() == Role.MAINTENANCE_CREW
-                        && u.getCompany() != null
-                        && u.getCompany().getId().equals(TenantContext.getCompanyId()))
+                .filter(u -> u.getRole() == Role.MAINTENANCE_CREW)
                 .orElseThrow(() -> new ResourceNotFoundException("Crew member not found"));
 
         crew.setAvailable(false);
@@ -406,6 +406,10 @@ public class MaintenanceFlagServiceImpl implements MaintenanceFlagService {
     }
 
     private MaintenanceFlag getOrThrow(Long id) {
+        if (currentUser().getRole() == Role.MAINTENANCE_CREW) {
+            return flagRepository.findById(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("Flag not found: " + id));
+        }
         return flagRepository.findByIdAndCompanyId(id, TenantContext.getCompanyId())
                 .orElseThrow(() -> new ResourceNotFoundException("Flag not found: " + id));
     }

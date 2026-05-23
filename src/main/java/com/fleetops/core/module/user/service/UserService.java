@@ -15,6 +15,7 @@ public interface UserService {
     void resetPassword(Long id, ResetPasswordRequest request);
     UserResponse createCrewMember(CreateUserRequest request);
     List<UserResponse> getAllCrew();
+    List<UserResponse> getAvailableCrew();
     UserResponse getCrewById(Long id);
     void deleteCrew(Long id);
     void updateProfileImage(Long userId, String url, String publicId);

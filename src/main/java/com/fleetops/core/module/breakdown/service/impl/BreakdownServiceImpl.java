@@ -21,6 +21,7 @@ import com.fleetops.core.module.maintenance.model.FlagStatus;
 import com.fleetops.core.module.maintenance.model.MaintenanceFlag;
 import com.fleetops.core.module.maintenance.model.TriggerType;
 import com.fleetops.core.module.maintenance.repository.MaintenanceFlagRepository;
+import com.fleetops.core.module.triprequest.model.TripRequest;
 import com.fleetops.core.module.triprequest.model.TripRequestStatus;
 import com.fleetops.core.module.triprequest.repository.TripRequestRepository;
 import com.fleetops.core.module.user.model.Role;
@@ -38,6 +39,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -172,10 +174,38 @@ public class BreakdownServiceImpl implements BreakdownService {
             throw new BreakdownException("Replacement vehicle is not available");
         }
 
+        var staff = userRepository.findById(request.getStaffId())
+                .orElseThrow(() -> new ResourceNotFoundException("Staff member not found"));
+        if (staff.getRole() != Role.FIELD_STAFF) {
+            throw new BreakdownException("Assigned user is not a field staff member");
+        }
+        if (!staff.getCompany().getId().equals(companyId)) {
+            throw new BreakdownException("Staff member does not belong to this company");
+        }
+        if (!staff.isEnabled()) {
+            throw new BreakdownException("Staff member is not active");
+        }
+
         replacement.setStatus(VehicleStatus.ASSIGNED);
         vehicleRepository.save(replacement);
 
+        String destination = report.getLocationDescription() != null
+                ? report.getLocationDescription()
+                : String.format("%.4f, %.4f", report.getLatitude(), report.getLongitude());
+
+        TripRequest replacementTrip = tripRequestRepository.save(TripRequest.builder()
+                .company(report.getCompany())
+                .vehicle(replacement)
+                .requestedBy(staff)
+                .destination(destination)
+                .startDate(LocalDate.now())
+                .endDate(LocalDate.now().plusDays(1))
+                .status(TripRequestStatus.APPROVED)
+                .approvedAt(LocalDateTime.now())
+                .build());
+
         report.setReplacementVehicle(replacement);
+        report.setReplacementTripRequest(replacementTrip);
         report.setStatus(BreakdownStatus.REPLACEMENT_DISPATCHED);
         breakdownRepository.save(report);
 
@@ -188,6 +218,17 @@ public class BreakdownServiceImpl implements BreakdownService {
                         "Hi %s,\n\nA replacement vehicle (%s) has been dispatched to your location.\n\nFleetOps System",
                         fieldStaff.getName(), replacement.getPlateNumber()))
                 .type("REPLACEMENT_DISPATCHED")
+                .occurredAt(LocalDateTime.now())
+                .build());
+
+        notificationEventProducer.publish(NotificationRequestEvent.builder()
+                .recipientEmail(staff.getEmail())
+                .recipientName(staff.getName())
+                .subject("Emergency Trip Assigned: " + replacement.getPlateNumber())
+                .message(String.format(
+                        "Hi %s,\n\nYou have been assigned an emergency replacement trip.\nVehicle: %s\nDestination: %s\n\nFleetOps System",
+                        staff.getName(), replacement.getPlateNumber(), destination))
+                .type("REPLACEMENT_TRIP_ASSIGNED")
                 .occurredAt(LocalDateTime.now())
                 .build());
 

@@ -149,6 +149,12 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public List<UserResponse> getAvailableCrew() {
+        return userRepository.findByRoleAndAvailableTrue(Role.MAINTENANCE_CREW)
+                .stream().map(UserResponse::from).toList();
+    }
+
+    @Override
     public UserResponse getCrewById(Long id) {
         return UserResponse.from(userRepository.findById(id)
                 .filter(u -> u.getRole() == Role.MAINTENANCE_CREW
