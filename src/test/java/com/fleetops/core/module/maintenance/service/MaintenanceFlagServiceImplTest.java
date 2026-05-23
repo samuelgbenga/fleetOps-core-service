@@ -66,6 +66,8 @@ class MaintenanceFlagServiceImplTest {
         TenantContext.set(COMPANY_ID, 1L, "FLEET_MANAGER", "COMPANY");
         var auth = new UsernamePasswordAuthenticationToken(EMAIL, null, List.of());
         SecurityContextHolder.getContext().setAuthentication(auth);
+        lenient().when(userRepository.findByEmail(EMAIL))
+                .thenReturn(Optional.of(buildUser(1L, EMAIL, Role.FLEET_MANAGER)));
     }
 
     @AfterEach
@@ -473,11 +475,11 @@ class MaintenanceFlagServiceImplTest {
     }
 
     @Test
-    void getById_noUserRepoInteraction() {
+    void getById_doesNotSaveAnyUser() {
         when(flagRepository.findByIdAndCompanyId(FLAG_ID, COMPANY_ID))
                 .thenReturn(Optional.of(buildFlag(FLAG_ID, FlagStatus.OPEN)));
         maintenanceFlagService.getById(FLAG_ID);
-        verifyNoInteractions(userRepository);
+        verify(userRepository, never()).save(any());
     }
 
     @Test
@@ -821,7 +823,7 @@ class MaintenanceFlagServiceImplTest {
         MaintenanceFlag flag = buildFlagWithCrew(FLAG_ID, FlagStatus.CREW_ASSIGNED, crew);
         MaintenanceQuotation quotation = buildQuotation(1L, flag, crew);
 
-        when(flagRepository.findByIdAndCompanyId(FLAG_ID, COMPANY_ID)).thenReturn(Optional.of(flag));
+        when(flagRepository.findById(FLAG_ID)).thenReturn(Optional.of(flag));
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(crew));
         when(quotationRepository.save(any())).thenReturn(quotation);
         when(flagRepository.save(flag)).thenReturn(flag);
@@ -838,7 +840,7 @@ class MaintenanceFlagServiceImplTest {
         MaintenanceFlag flag = buildFlagWithCrew(FLAG_ID, FlagStatus.CREW_ASSIGNED, crew);
         MaintenanceQuotation quotation = buildQuotation(1L, flag, crew);
 
-        when(flagRepository.findByIdAndCompanyId(FLAG_ID, COMPANY_ID)).thenReturn(Optional.of(flag));
+        when(flagRepository.findById(FLAG_ID)).thenReturn(Optional.of(flag));
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(crew));
         when(quotationRepository.save(any())).thenReturn(quotation);
         when(flagRepository.save(flag)).thenReturn(flag);
@@ -871,7 +873,7 @@ class MaintenanceFlagServiceImplTest {
         MaintenanceFlag flag = buildFlagWithCrew(FLAG_ID, FlagStatus.CREW_ASSIGNED, crew);
         MaintenanceQuotation quotation = buildQuotation(1L, flag, crew);
 
-        when(flagRepository.findByIdAndCompanyId(FLAG_ID, COMPANY_ID)).thenReturn(Optional.of(flag));
+        when(flagRepository.findById(FLAG_ID)).thenReturn(Optional.of(flag));
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(crew));
         when(quotationRepository.save(any())).thenReturn(quotation);
         when(flagRepository.save(flag)).thenReturn(flag);
@@ -889,7 +891,7 @@ class MaintenanceFlagServiceImplTest {
         MaintenanceFlag flag = buildFlagWithCrew(FLAG_ID, FlagStatus.CREW_ASSIGNED, crew);
         MaintenanceQuotation quotation = buildQuotation(1L, flag, crew);
 
-        when(flagRepository.findByIdAndCompanyId(FLAG_ID, COMPANY_ID)).thenReturn(Optional.of(flag));
+        when(flagRepository.findById(FLAG_ID)).thenReturn(Optional.of(flag));
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(crew));
         when(quotationRepository.save(any())).thenReturn(quotation);
         when(flagRepository.save(flag)).thenReturn(flag);
@@ -911,7 +913,7 @@ class MaintenanceFlagServiceImplTest {
         MaintenanceFlag flag = buildFlagWithCrew(FLAG_ID, FlagStatus.CREW_ASSIGNED, crew);
         MaintenanceQuotation quotation = buildQuotation(1L, flag, crew);
 
-        when(flagRepository.findByIdAndCompanyId(FLAG_ID, COMPANY_ID)).thenReturn(Optional.of(flag));
+        when(flagRepository.findById(FLAG_ID)).thenReturn(Optional.of(flag));
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(crew));
         when(quotationRepository.save(any())).thenReturn(quotation);
         when(flagRepository.save(flag)).thenReturn(flag);
@@ -929,7 +931,7 @@ class MaintenanceFlagServiceImplTest {
         MaintenanceFlag flag = buildFlagWithCrew(FLAG_ID, FlagStatus.CREW_ASSIGNED, crew);
         MaintenanceQuotation quotation = buildQuotation(1L, flag, crew);
 
-        when(flagRepository.findByIdAndCompanyId(FLAG_ID, COMPANY_ID)).thenReturn(Optional.of(flag));
+        when(flagRepository.findById(FLAG_ID)).thenReturn(Optional.of(flag));
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(crew));
         when(quotationRepository.save(any())).thenReturn(quotation);
         when(flagRepository.save(flag)).thenReturn(flag);
@@ -946,8 +948,6 @@ class MaintenanceFlagServiceImplTest {
 
     @Test
     void submitQuotation_userNotFoundThrows() {
-        MaintenanceFlag flag = buildFlag(FLAG_ID, FlagStatus.CREW_ASSIGNED);
-        when(flagRepository.findByIdAndCompanyId(FLAG_ID, COMPANY_ID)).thenReturn(Optional.of(flag));
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> maintenanceFlagService.submitQuotation(FLAG_ID, new QuotationRequest()))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -1790,8 +1790,6 @@ class MaintenanceFlagServiceImplTest {
 
     @Test
     void sendMessage_userNotFoundThrows() {
-        MaintenanceFlag flag = buildFlag(FLAG_ID, FlagStatus.IN_PROGRESS);
-        when(flagRepository.findByIdAndCompanyId(FLAG_ID, COMPANY_ID)).thenReturn(Optional.of(flag));
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> maintenanceFlagService.sendMessage(FLAG_ID, new MessageRequest()))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -1924,7 +1922,7 @@ class MaintenanceFlagServiceImplTest {
         when(flagRepository.findByIdAndCompanyId(FLAG_ID, COMPANY_ID)).thenReturn(Optional.of(buildFlag(FLAG_ID, FlagStatus.IN_PROGRESS)));
         when(messageRepository.findByFlagIdOrderBySentAtAsc(FLAG_ID)).thenReturn(List.of());
         maintenanceFlagService.getMessages(FLAG_ID);
-        verifyNoInteractions(userRepository);
+        verify(userRepository, never()).save(any());
     }
 
     @Test

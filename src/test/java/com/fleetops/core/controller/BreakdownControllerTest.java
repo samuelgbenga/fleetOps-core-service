@@ -157,7 +157,7 @@ class BreakdownControllerTest extends BaseControllerIntegrationTest {
                         .header("Authorization", fleetManagerToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"replacementVehicleId":20}
+                                {"replacementVehicleId":20,"staffId":12}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.replacementVehicleId").value(20));
@@ -169,7 +169,7 @@ class BreakdownControllerTest extends BaseControllerIntegrationTest {
                         .header("Authorization", fieldStaffToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"replacementVehicleId":20}
+                                {"replacementVehicleId":20,"staffId":12}
                                 """))
                 .andExpect(status().isForbidden());
     }

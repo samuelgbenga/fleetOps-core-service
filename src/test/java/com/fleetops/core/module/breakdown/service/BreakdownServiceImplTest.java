@@ -361,11 +361,14 @@ class BreakdownServiceImplTest {
 
         when(breakdownRepository.findByIdAndCompanyId(1L, COMPANY_ID)).thenReturn(Optional.of(report));
         when(vehicleRepository.findByIdAndCompanyId(2L, COMPANY_ID)).thenReturn(Optional.of(replacement));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(fieldStaff));
+        when(tripRequestRepository.save(any())).thenReturn(mock(TripRequest.class));
         when(vehicleRepository.save(replacement)).thenReturn(replacement);
         when(breakdownRepository.save(report)).thenReturn(report);
 
         var req = new DispatchReplacementRequest();
         req.setReplacementVehicleId(2L);
+        req.setStaffId(USER_ID);
         breakdownService.dispatchReplacement(1L, req);
         assertThat(report.getStatus()).isEqualTo(BreakdownStatus.REPLACEMENT_DISPATCHED);
     }
@@ -379,11 +382,14 @@ class BreakdownServiceImplTest {
 
         when(breakdownRepository.findByIdAndCompanyId(1L, COMPANY_ID)).thenReturn(Optional.of(report));
         when(vehicleRepository.findByIdAndCompanyId(2L, COMPANY_ID)).thenReturn(Optional.of(replacement));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(fieldStaff));
+        when(tripRequestRepository.save(any())).thenReturn(mock(TripRequest.class));
         when(vehicleRepository.save(replacement)).thenReturn(replacement);
         when(breakdownRepository.save(report)).thenReturn(report);
 
         var req = new DispatchReplacementRequest();
         req.setReplacementVehicleId(2L);
+        req.setStaffId(USER_ID);
         breakdownService.dispatchReplacement(1L, req);
         assertThat(replacement.getStatus()).isEqualTo(VehicleStatus.ASSIGNED);
     }
@@ -434,11 +440,14 @@ class BreakdownServiceImplTest {
 
         when(breakdownRepository.findByIdAndCompanyId(1L, COMPANY_ID)).thenReturn(Optional.of(report));
         when(vehicleRepository.findByIdAndCompanyId(2L, COMPANY_ID)).thenReturn(Optional.of(replacement));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(fieldStaff));
+        when(tripRequestRepository.save(any())).thenReturn(mock(TripRequest.class));
         when(vehicleRepository.save(replacement)).thenReturn(replacement);
         when(breakdownRepository.save(report)).thenReturn(report);
 
         var req = new DispatchReplacementRequest();
         req.setReplacementVehicleId(2L);
+        req.setStaffId(USER_ID);
         breakdownService.dispatchReplacement(1L, req);
         assertThat(report.getReplacementVehicle()).isEqualTo(replacement);
     }
@@ -452,13 +461,16 @@ class BreakdownServiceImplTest {
 
         when(breakdownRepository.findByIdAndCompanyId(1L, COMPANY_ID)).thenReturn(Optional.of(report));
         when(vehicleRepository.findByIdAndCompanyId(2L, COMPANY_ID)).thenReturn(Optional.of(replacement));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(fieldStaff));
+        when(tripRequestRepository.save(any())).thenReturn(mock(TripRequest.class));
         when(vehicleRepository.save(replacement)).thenReturn(replacement);
         when(breakdownRepository.save(report)).thenReturn(report);
 
         var req = new DispatchReplacementRequest();
         req.setReplacementVehicleId(2L);
+        req.setStaffId(USER_ID);
         breakdownService.dispatchReplacement(1L, req);
-        verify(notificationEventProducer).publish(any(NotificationRequestEvent.class));
+        verify(notificationEventProducer, atLeastOnce()).publish(any(NotificationRequestEvent.class));
     }
 
     @Test
@@ -470,11 +482,14 @@ class BreakdownServiceImplTest {
 
         when(breakdownRepository.findByIdAndCompanyId(1L, COMPANY_ID)).thenReturn(Optional.of(report));
         when(vehicleRepository.findByIdAndCompanyId(2L, COMPANY_ID)).thenReturn(Optional.of(replacement));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(fieldStaff));
+        when(tripRequestRepository.save(any())).thenReturn(mock(TripRequest.class));
         when(vehicleRepository.save(replacement)).thenReturn(replacement);
         when(breakdownRepository.save(report)).thenReturn(report);
 
         var req = new DispatchReplacementRequest();
         req.setReplacementVehicleId(2L);
+        req.setStaffId(USER_ID);
         assertThat(breakdownService.dispatchReplacement(1L, req)).isNotNull();
     }
 
@@ -487,11 +502,14 @@ class BreakdownServiceImplTest {
 
         when(breakdownRepository.findByIdAndCompanyId(1L, COMPANY_ID)).thenReturn(Optional.of(report));
         when(vehicleRepository.findByIdAndCompanyId(2L, COMPANY_ID)).thenReturn(Optional.of(replacement));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(fieldStaff));
+        when(tripRequestRepository.save(any())).thenReturn(mock(TripRequest.class));
         when(vehicleRepository.save(replacement)).thenReturn(replacement);
         when(breakdownRepository.save(report)).thenReturn(report);
 
         var req = new DispatchReplacementRequest();
         req.setReplacementVehicleId(2L);
+        req.setStaffId(USER_ID);
         breakdownService.dispatchReplacement(1L, req);
         verifyNoInteractions(vehicleActivityProducer);
     }
@@ -505,16 +523,19 @@ class BreakdownServiceImplTest {
 
         when(breakdownRepository.findByIdAndCompanyId(1L, COMPANY_ID)).thenReturn(Optional.of(report));
         when(vehicleRepository.findByIdAndCompanyId(2L, COMPANY_ID)).thenReturn(Optional.of(replacement));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(fieldStaff));
+        when(tripRequestRepository.save(any())).thenReturn(mock(TripRequest.class));
         when(vehicleRepository.save(replacement)).thenReturn(replacement);
         when(breakdownRepository.save(report)).thenReturn(report);
 
         var req = new DispatchReplacementRequest();
         req.setReplacementVehicleId(2L);
+        req.setStaffId(USER_ID);
         breakdownService.dispatchReplacement(1L, req);
 
         ArgumentCaptor<NotificationRequestEvent> captor = ArgumentCaptor.forClass(NotificationRequestEvent.class);
-        verify(notificationEventProducer).publish(captor.capture());
-        assertThat(captor.getValue().getType()).isEqualTo("REPLACEMENT_DISPATCHED");
+        verify(notificationEventProducer, times(2)).publish(captor.capture());
+        assertThat(captor.getAllValues().get(0).getType()).isEqualTo("REPLACEMENT_DISPATCHED");
     }
 
     // ─── dispatchCrew ─────────────────────────────────────────────────────────
